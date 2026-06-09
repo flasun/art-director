@@ -1,0 +1,52 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import type { z } from "zod";
+import { requireEnv } from "./config.js";
+
+let client: Anthropic | null = null;
+
+function getClient(): Anthropic {
+  if (!client) {
+    requireEnv("ANTHROPIC_API_KEY", "Create a key at https://platform.claude.com and put it in .env");
+    client = new Anthropic();
+  }
+  return client;
+}
+
+export type ContentBlock = Anthropic.ContentBlockParam;
+
+export function textBlock(text: string): ContentBlock {
+  return { type: "text", text };
+}
+
+export function imageBlock(png: Buffer): ContentBlock {
+  return {
+    type: "image",
+    source: { type: "base64", media_type: "image/png", data: png.toString("base64") },
+  };
+}
+
+/**
+ * One structured director call: system prompt + content blocks in,
+ * schema-validated object out.
+ */
+export async function directorCall<Schema extends z.ZodType>(opts: {
+  model: string;
+  system: string;
+  content: ContentBlock[];
+  schema: Schema;
+  schemaName: string;
+}): Promise<z.infer<Schema>> {
+  const response = await getClient().messages.parse({
+    model: opts.model,
+    max_tokens: 16000,
+    thinking: { type: "adaptive" },
+    system: opts.system,
+    messages: [{ role: "user", content: opts.content }],
+    output_config: { format: zodOutputFormat(opts.schema) },
+  });
+  if (response.parsed_output == null) {
+    throw new Error(`Director response for ${opts.schemaName} did not match the expected schema`);
+  }
+  return response.parsed_output;
+}
