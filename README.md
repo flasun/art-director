@@ -69,6 +69,7 @@ You can also `npm run build` and use the `art-director` bin directly.
 | `audit <shotDirs...>` | Set-audit existing finals: do they read as one campaign? Writes `campaigns/<date>/report.md` + sheet |
 | `critique <images...>` | Judge existing images against the Style Contract |
 | `taste` | Show the cross-project taste profile the director learns about you (`--forget` resets it) |
+| `export` | Figma-ready handoff package: pure-SVG brand board (drags into Figma as editable vectors), `direction.md`, every shipped final, and a gallery page |
 
 Global flag: `-C, --dir <dir>` selects the project directory. `shoot` takes `--rounds` and `--candidates` to override the budget, and `--seed` to reproduce a previous shoot exactly (every shoot logs its base seed). Each shoot also records its spend — director tokens and render counts — in `critique.md`.
 

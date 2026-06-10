@@ -8,6 +8,7 @@ import { runChecks } from "./checks.js";
 import { loadConfig } from "./config.js";
 import { serializeContract } from "./contract.js";
 import { amendDirection, critiqueCandidates } from "./director.js";
+import { runExport } from "./export.js";
 import { runInterview } from "./interview.js";
 import { initProject, readContract, writeContract } from "./project.js";
 import { recritique } from "./recritique.js";
@@ -137,6 +138,17 @@ program
         log,
       );
     }
+  });
+
+program
+  .command("export")
+  .option("-o, --out <dir>", "write the package here instead of exports/<date>-<name>")
+  .description("Export a Figma-ready package: SVG brand board, direction.md, and all shipped finals")
+  .action((opts: { out?: string }) => {
+    const projectDir = program.opts<{ dir: string }>().dir;
+    const contract = readContract(projectDir);
+    const result = runExport({ projectDir, contract, log, outDir: opts.out });
+    log(`  Open ${path.join(result.outDir, "index.html")} — drag brand-sheet.svg into Figma for editable vectors.`);
   });
 
 program
