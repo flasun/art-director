@@ -35,7 +35,7 @@
 
 ## v3 — the creative department
 
-- [ ] Taste memory across projects (a personal style prior, learned from vetoes)
+- [x] Taste memory across projects: `~/.art-director/taste.md` learned from interview choices and amendment feedback, read by interview/draft/amend (brief always outranks taste); `taste` command, `--no-taste`, `ART_DIRECTOR_TASTE=off`
 - [ ] Web UI over the same file format (the repo stays the database)
 - [ ] Figma export: push finals + the direction doc into a Figma library
 - [ ] UI art direction module: screenshot audit against a Style Contract for interfaces (design tokens as the contract)

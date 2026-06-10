@@ -8,6 +8,19 @@ language into explicit, enforceable visual direction, and you judge work against
 not against your personal preferences. You are decisive: every judgement comes with concrete,
 visual reasons a junior could act on. You never pad, hedge, or flatter.`;
 
+/**
+ * Renders the cross-project taste prior as prompt context. The brief
+ * always outranks it — taste sharpens defaults, never overrides intent.
+ */
+function tasteContext(taste: string | null | undefined): string {
+  if (!taste) return "";
+  return `
+
+THE CLIENT'S TASTE PROFILE (a prior learned from their past projects — use it to sharpen
+defaults and probe uncertain dimensions, but the BRIEF always outranks it where they conflict):
+${taste}`;
+}
+
 // ---------------------------------------------------------------------------
 // Creative interview
 
@@ -24,7 +37,11 @@ const InterviewQuestionsSchema = z.object({
 
 export type InterviewQuestions = z.infer<typeof InterviewQuestionsSchema>;
 
-export async function generateInterview(model: string, brief: string): Promise<InterviewQuestions> {
+export async function generateInterview(
+  model: string,
+  brief: string,
+  taste?: string | null,
+): Promise<InterviewQuestions> {
   return directorCall({
     model,
     system: SYSTEM,
@@ -36,10 +53,16 @@ export async function generateInterview(model: string, brief: string): Promise<I
 the client's taste. Each question must probe a DIFFERENT visual dimension (e.g. color temperature,
 palette saturation, composition density, lighting character, medium/texture, era/reference).
 Options must be concrete and visual — something the client can picture — never abstract labels.
-Cover the dimensions the brief leaves most ambiguous.
+Cover the dimensions the brief leaves most ambiguous.${
+          taste
+            ? `
+A taste profile is provided below: spend fewer questions on dimensions it already settles and
+more on what it leaves uncertain or what this brief makes unusual.`
+            : ""
+        }
 
 BRIEF:
-${brief}`,
+${brief}${tasteContext(taste)}`,
       ),
     ],
   });
@@ -99,6 +122,7 @@ export async function draftDirection(
   model: string,
   brief: string,
   interviewTranscript: string,
+  taste?: string | null,
 ): Promise<StyleContract> {
   const draft = await directorCall({
     model,
@@ -116,7 +140,7 @@ BRIEF:
 ${brief}
 
 CREATIVE INTERVIEW (the client's forced choices reveal their taste):
-${interviewTranscript}`,
+${interviewTranscript}${tasteContext(taste)}`,
       ),
     ],
   });
@@ -138,6 +162,7 @@ export async function amendDirection(
   current: StyleContract,
   feedback: string,
   referenceImages: Buffer[],
+  taste?: string | null,
 ): Promise<{ contract: StyleContract; summary: string; changes: string[] }> {
   const content = [
     textBlock(
@@ -151,7 +176,7 @@ CURRENT STYLE CONTRACT:
 ${serializeContract(current)}
 
 CLIENT FEEDBACK:
-${feedback}`,
+${feedback}${tasteContext(taste)}`,
     ),
     ...referenceImages.map((img) => imageBlock(img)),
   ];
@@ -169,6 +194,51 @@ ${feedback}`,
     summary: result.summary,
     changes: result.changes,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Taste memory — the cross-project style prior
+
+const TasteUpdateSchema = z.object({
+  profile: z.string().describe("The complete revised taste profile in markdown"),
+  changed: z
+    .array(z.string())
+    .describe("What was learned or revised this time; empty if the evidence adds nothing durable"),
+});
+
+export async function updateTasteProfile(
+  model: string,
+  currentProfile: string | null,
+  source: string,
+  evidence: string,
+): Promise<{ profile: string; changed: string[] }> {
+  return directorCall({
+    model,
+    system: SYSTEM,
+    schema: TasteUpdateSchema,
+    schemaName: "taste_update",
+    content: [
+      textBlock(
+        `Maintain the client's cross-project taste profile. Fold the new evidence into the current
+profile. Rules:
+- Record only DURABLE personal taste (palette leanings, light, density, texture aversions) —
+  never project-specific subjects, products, or one-off campaign constraints.
+- Strengthen items the evidence confirms; revise or drop items it contradicts.
+- Structure: a one-line header ("Taste profile — updated from <source>"), then sections
+  "## Leanings", "## Aversions", "## Patterns from choices". Bullets, concrete and visual.
+- Keep the whole profile under 400 words. Prefer dropping weak items over growing it.
+- If the evidence carries nothing durable, return the profile unchanged and an empty "changed" list.
+
+CURRENT PROFILE:
+${currentProfile ?? "(none yet — start one)"}
+
+EVIDENCE SOURCE: ${source}
+
+NEW EVIDENCE:
+${evidence}`,
+      ),
+    ],
+  });
 }
 
 // ---------------------------------------------------------------------------
