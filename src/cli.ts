@@ -13,10 +13,23 @@ import { initProject, readContract, writeContract } from "./project.js";
 import { recritique } from "./recritique.js";
 import { rerender } from "./rerender.js";
 import { shoot, type ShootReference } from "./shoot.js";
+import {
+  deleteTasteProfile,
+  readTasteProfile,
+  recordTasteEvidence,
+  tasteEnabled,
+  tasteFilePath,
+} from "./taste.js";
 import type { Candidate } from "./types.js";
 import { renderUsage } from "./usage.js";
 
 const log = (message: string) => console.log(message);
+
+// Exit quietly when output is piped to a consumer that closes early (head, grep -m).
+process.stdout.on("error", (error: NodeJS.ErrnoException) => {
+  if (error.code === "EPIPE") process.exit(0);
+  throw error;
+});
 
 function loadReference(projectDir: string, refPath: string | undefined): ShootReference | undefined {
   if (!refPath) return undefined;
@@ -44,12 +57,19 @@ program
 program
   .command("interview")
   .option("--probes", "render each forced choice as a pair of probe images (uses the image backend)")
+  .option("--no-taste", "skip reading and updating the cross-project taste profile")
   .description("Run the creative interview and draft direction.md (the Style Contract)")
-  .action(async (opts: { probes?: boolean }) => {
+  .action(async (opts: { probes?: boolean; taste: boolean }) => {
     const projectDir = program.opts<{ dir: string }>().dir;
     const config = loadConfig();
     const backend = opts.probes ? createBackend(config) : undefined;
-    const directionPath = await runInterview({ model: config.directorModel, projectDir, log, backend });
+    const directionPath = await runInterview({
+      model: config.directorModel,
+      projectDir,
+      log,
+      backend,
+      noTaste: !opts.taste,
+    });
     log(`\nWrote ${directionPath}. Edit it freely — it is the source of truth.`);
     log(`Next: art-director shoot "<what to produce>"`);
   });
@@ -93,18 +113,49 @@ program
   .command("amend")
   .argument("<feedback...>", "what should change, e.g. \"warmer light, less clutter\"")
   .option("--ref <images...>", "reference image(s) the feedback points at")
+  .option("--no-taste", "skip reading and updating the cross-project taste profile")
   .description("Amend the Style Contract from feedback — the director folds it into direction.md")
-  .action(async (feedbackParts: string[], opts: { ref?: string[] }) => {
+  .action(async (feedbackParts: string[], opts: { ref?: string[]; taste: boolean }) => {
     const projectDir = program.opts<{ dir: string }>().dir;
     const config = loadConfig();
     const contract = readContract(projectDir);
     const referenceImages = (opts.ref ?? []).map((file) => fs.readFileSync(file));
+    const feedback = feedbackParts.join(" ");
+    const taste = opts.taste && tasteEnabled() ? readTasteProfile() : null;
 
-    const result = await amendDirection(config.directorModel, contract, feedbackParts.join(" "), referenceImages);
+    const result = await amendDirection(config.directorModel, contract, feedback, referenceImages, taste);
     writeContract(projectDir, serializeContract(result.contract));
     log(`direction.md v${contract.version} -> v${result.contract.version}: ${result.summary}`);
     for (const change of result.changes) log(`  · ${change}`);
     log("Previous version lives in git history — diff it to review the amendment.");
+
+    if (opts.taste) {
+      await recordTasteEvidence(
+        config.directorModel,
+        `contract amendment (project "${contract.name}")`,
+        `FEEDBACK: ${feedback}\nCHANGES MADE: ${result.changes.join("; ")}`,
+        log,
+      );
+    }
+  });
+
+program
+  .command("taste")
+  .option("--forget", "delete the taste profile")
+  .description("Show (or --forget) the cross-project taste profile the director learns about you")
+  .action((opts: { forget?: boolean }) => {
+    if (opts.forget) {
+      log(deleteTasteProfile() ? `Deleted ${tasteFilePath()}` : `No taste profile at ${tasteFilePath()}`);
+      return;
+    }
+    const profile = readTasteProfile();
+    if (!profile) {
+      log(`No taste profile yet (${tasteFilePath()}).`);
+      log("It builds automatically from interviews and amendments; disable with ART_DIRECTOR_TASTE=off.");
+      return;
+    }
+    log(profile.trimEnd());
+    log(`\n(${tasteFilePath()} — edit freely, or run "taste --forget" to reset)`);
   });
 
 program

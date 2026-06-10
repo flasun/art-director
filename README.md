@@ -68,6 +68,7 @@ You can also `npm run build` and use the `art-director` bin directly.
 | `campaign <shotsFile>` | Shoot every line of a file under one contract, then audit the finals as a set. `--ref` applies one reference to every shot |
 | `audit <shotDirs...>` | Set-audit existing finals: do they read as one campaign? Writes `campaigns/<date>/report.md` + sheet |
 | `critique <images...>` | Judge existing images against the Style Contract |
+| `taste` | Show the cross-project taste profile the director learns about you (`--forget` resets it) |
 
 Global flag: `-C, --dir <dir>` selects the project directory. `shoot` takes `--rounds` and `--candidates` to override the budget, and `--seed` to reproduce a previous shoot exactly (every shoot logs its base seed). Each shoot also records its spend — director tokens and render counts — in `critique.md`.
 
@@ -86,6 +87,10 @@ The Style Contract compiles to per-model prompts through dialect adapters, so di
 
 Critique is half computed, half directed. Deterministic checks run first — dominant-color extraction with CIELAB distance against the contract palette, tonal key/contrast stats, plus aspect-ratio verification — and the measured numbers are handed to Claude alongside the images. Claude then critiques each candidate against the contract rubric (mood, composition, lighting, NEVER rules, technical flaws), ranks candidates by pairwise comparison, and either ships one or rewrites the prompt for the next round. Hard budgets (`ART_DIRECTOR_ROUNDS` × `ART_DIRECTOR_CANDIDATES`, default 2 × 4 drafts + 1 final) keep costs bounded.
 
+## Taste memory
+
+The director keeps a small cross-project style prior at `~/.art-director/taste.md` — leanings, aversions, and patterns distilled from your interview choices and amendment feedback. New projects start closer to your taste: the interview spends its questions on what's still uncertain, and drafts lean on what's known. Two rules keep it honest: **the brief always outranks taste** (a neon-cyberpunk brief won't be dragged warm by your coffee-shop history), and only durable preferences are recorded — never project subjects. It's a plain markdown file: read it with `art-director taste`, edit it by hand, reset with `taste --forget`, skip it per-run with `--no-taste`, or disable globally with `ART_DIRECTOR_TASTE=off`.
+
 ## Configuration
 
 Set in `.env` (see `.env.example`):
@@ -101,6 +106,8 @@ Set in `.env` (see `.env.example`):
 | `ART_DIRECTOR_BACKEND` | `replicate` | Image backend: `replicate` or `gpt-image` |
 | `OPENAI_API_KEY` | — | Required only for the `gpt-image` backend |
 | `OPENAI_IMAGE_MODEL` | `gpt-image-1` | Model for the `gpt-image` backend |
+| `ART_DIRECTOR_TASTE` | on | Set `off` to disable taste memory entirely |
+| `ART_DIRECTOR_TASTE_FILE` | `~/.art-director/taste.md` | Where the taste profile lives |
 | `ART_DIRECTOR_ROUNDS` | `2` | Max critique rounds per shot |
 | `ART_DIRECTOR_CANDIDATES` | `4` | Candidates per round |
 

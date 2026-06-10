@@ -6,6 +6,7 @@ import { renderProbeSheet, type ProbePair } from "./contactsheet.js";
 import { serializeContract } from "./contract.js";
 import { draftDirection, generateInterview, type InterviewQuestions } from "./director.js";
 import { readBrief, writeContract } from "./project.js";
+import { readTasteProfile, recordTasteEvidence, tasteEnabled } from "./taste.js";
 
 interface InterviewDeps {
   model: string;
@@ -13,6 +14,8 @@ interface InterviewDeps {
   log: (message: string) => void;
   /** When set, each forced choice is rendered as a pair of probe images. */
   backend?: ImageBackend;
+  /** Skip reading and updating the cross-project taste profile. */
+  noTaste?: boolean;
 }
 
 async function renderProbes(
@@ -49,8 +52,10 @@ async function renderProbes(
 export async function runInterview(deps: InterviewDeps): Promise<string> {
   const brief = readBrief(deps.projectDir);
 
+  const taste = !deps.noTaste && tasteEnabled() ? readTasteProfile() : null;
+  if (taste) deps.log("Using your taste profile to sharpen the interview.");
   deps.log("Reading the brief and preparing the creative interview...");
-  const { questions } = await generateInterview(deps.model, brief);
+  const { questions } = await generateInterview(deps.model, brief, taste);
 
   let probeSheet: string | null = null;
   if (deps.backend) {
@@ -86,11 +91,20 @@ export async function runInterview(deps: InterviewDeps): Promise<string> {
   }
 
   deps.log("\nDrafting the Style Contract from your choices...");
-  const contract = await draftDirection(deps.model, brief, transcript.join("\n\n"));
+  const contract = await draftDirection(deps.model, brief, transcript.join("\n\n"), taste);
   const directionPath = writeContract(deps.projectDir, serializeContract(contract));
 
   deps.log(`\n${contract.name} — ${contract.essence}`);
   deps.log(`Palette: ${contract.palette.map((c) => `${c.hex} ${c.name}`).join(", ")}`);
   deps.log(`Never: ${contract.never.join("; ")}`);
+
+  if (!deps.noTaste) {
+    await recordTasteEvidence(
+      deps.model,
+      `creative interview (project "${contract.name}")`,
+      transcript.join("\n\n"),
+      deps.log,
+    );
+  }
   return directionPath;
 }
