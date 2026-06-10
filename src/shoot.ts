@@ -19,6 +19,12 @@ export interface ShootResult {
   baseSeed: number;
 }
 
+export interface ShootReference {
+  /** Path relative to the project dir, recorded in the manifest. */
+  file: string;
+  png: Buffer;
+}
+
 interface ShootDeps {
   config: Config;
   backend: ImageBackend;
@@ -27,6 +33,8 @@ interface ShootDeps {
   log: (message: string) => void;
   /** Pin for reproducible candidate seeds; omit for a random shoot. */
   baseSeed?: number;
+  /** Subject/product reference that conditions generation and critique. */
+  reference?: ShootReference;
 }
 
 /** Deterministic, non-overlapping seeds: same base seed, same shoot. */
@@ -35,7 +43,7 @@ export function seedsForRound(baseSeed: number, round: number, count: number): n
 }
 
 export async function shoot(deps: ShootDeps, shotDescription: string): Promise<ShootResult> {
-  const { config, backend, contract, log } = deps;
+  const { config, backend, contract, log, reference } = deps;
   const baseSeed = deps.baseSeed ?? Math.floor(Math.random() * 1_000_000_000);
   const shotDir = createShotDir(deps.projectDir, shotDescription);
   const rounds: RoundRecord[] = [];
@@ -43,8 +51,15 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
   let finalRenders = 0;
   resetClaudeUsage();
 
+  if (reference) log(`Using reference ${reference.file} to anchor the subject.`);
   log(`Compiling Style Contract into a ${backend.id} prompt...`);
-  let { prompt, rationale } = await compilePrompt(config.directorModel, contract, shotDescription, backend.dialect);
+  let { prompt, rationale } = await compilePrompt(
+    config.directorModel,
+    contract,
+    shotDescription,
+    backend.dialect,
+    reference?.png,
+  );
   log(`  ${rationale}`);
 
   let shipped: { candidate: Candidate; png: Buffer } | null = null;
@@ -57,7 +72,15 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
 
     const seeds = seedsForRound(baseSeed, round, config.candidatesPerRound);
     const images = await Promise.all(
-      seeds.map((seed) => backend.generate({ prompt, aspect: contract.aspect, seed, quality: "draft" })),
+      seeds.map((seed) =>
+        backend.generate({
+          prompt,
+          aspect: contract.aspect,
+          seed,
+          quality: "draft",
+          referenceImage: reference?.png,
+        }),
+      ),
     );
     draftRenders += images.length;
 
@@ -70,7 +93,13 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
     });
 
     log("  Critiquing against the contract...");
-    const critique = await critiqueCandidates(config.directorModel, contract, shotDescription, candidates);
+    const critique = await critiqueCandidates(
+      config.directorModel,
+      contract,
+      shotDescription,
+      candidates,
+      reference?.png,
+    );
     rounds.push({ round, prompt, candidates: candidates.map((c) => c.candidate), critique });
 
     for (const c of critique.critiques) {
@@ -108,6 +137,7 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
         aspect: contract.aspect,
         seed: winner.candidate.seed,
         quality: "final",
+        referenceImage: reference?.png,
       });
       finalRenders += 1;
       finalFile = "final.png";
@@ -133,6 +163,7 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
     shotDescription,
     baseSeed,
     contractVersion: contract.version,
+    referenceFile: reference?.file ?? null,
     rounds: rounds.map((r) => ({
       round: r.round,
       prompt: r.prompt,

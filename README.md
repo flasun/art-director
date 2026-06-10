@@ -61,10 +61,10 @@ You can also `npm run build` and use the `art-director` bin directly.
 |---|---|
 | `init [dir]` | Scaffold a project with a `brief.md` template |
 | `interview` | Forced-choice creative interview → drafts `direction.md`. Add `--probes` to render each choice as a pair of images (`probes.html`) |
-| `shoot <description>` | Generate → critique → revise loop, then a full-quality final render |
+| `shoot <description>` | Generate → critique → revise loop, then a full-quality final render. `--ref product.png` anchors the subject via image conditioning |
 | `amend <feedback>` | Fold feedback into the contract: `amend "warmer light" --ref liked.png` bumps the version, changes only what the feedback demands |
 | `recritique <shotDir>` | Re-judge an existing shoot against the current contract — no re-rendering. The natural follow-up to `amend` |
-| `campaign <shotsFile>` | Shoot every line of a file under one contract, then audit the finals as a set |
+| `campaign <shotsFile>` | Shoot every line of a file under one contract, then audit the finals as a set. `--ref` applies one reference to every shot |
 | `audit <shotDirs...>` | Set-audit existing finals: do they read as one campaign? Writes `campaigns/<date>/report.md` + sheet |
 | `critique <images...>` | Judge existing images against the Style Contract |
 
@@ -85,6 +85,7 @@ Set in `.env` (see `.env.example`):
 | `ART_DIRECTOR_MODEL` | `claude-opus-4-8` | Claude model for direction and critique |
 | `REPLICATE_DRAFT_MODEL` | `black-forest-labs/flux-schnell` | Fast, cheap candidate renders |
 | `REPLICATE_FINAL_MODEL` | `black-forest-labs/flux-1.1-pro` | Full-quality final render |
+| `REPLICATE_REF_DRAFT_MODEL` | `black-forest-labs/flux-dev` | Swapped in for drafts when a `--ref` image needs conditioning support (flux-schnell can't take one) |
 | `ART_DIRECTOR_ROUNDS` | `2` | Max critique rounds per shot |
 | `ART_DIRECTOR_CANDIDATES` | `4` | Candidates per round |
 

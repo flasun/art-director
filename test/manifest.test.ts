@@ -10,6 +10,7 @@ const MANIFEST: ShotManifest = {
   shotDescription: "hero image: pour-over at dawn",
   baseSeed: 123456,
   contractVersion: 1,
+  referenceFile: "refs/product.png",
   rounds: [
     {
       round: 1,
