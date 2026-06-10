@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Command } from "commander";
-import { createReplicateBackend } from "./backends/replicate.js";
+import { createBackend } from "./backends/index.js";
 import { auditShots, runCampaign } from "./campaign.js";
 import { runChecks } from "./checks.js";
 import { loadConfig } from "./config.js";
@@ -11,6 +11,7 @@ import { amendDirection, critiqueCandidates } from "./director.js";
 import { runInterview } from "./interview.js";
 import { initProject, readContract, writeContract } from "./project.js";
 import { recritique } from "./recritique.js";
+import { rerender } from "./rerender.js";
 import { shoot, type ShootReference } from "./shoot.js";
 import type { Candidate } from "./types.js";
 import { renderUsage } from "./usage.js";
@@ -47,13 +48,7 @@ program
   .action(async (opts: { probes?: boolean }) => {
     const projectDir = program.opts<{ dir: string }>().dir;
     const config = loadConfig();
-    const backend = opts.probes
-      ? createReplicateBackend({
-          draftModel: config.draftModel,
-          finalModel: config.finalModel,
-          refDraftModel: config.refDraftModel,
-        })
-      : undefined;
+    const backend = opts.probes ? createBackend(config) : undefined;
     const directionPath = await runInterview({ model: config.directorModel, projectDir, log, backend });
     log(`\nWrote ${directionPath}. Edit it freely — it is the source of truth.`);
     log(`Next: art-director shoot "<what to produce>"`);
@@ -66,19 +61,21 @@ program
   .option("-c, --candidates <n>", "candidates per round")
   .option("-s, --seed <n>", "base seed for reproducible candidate seeds")
   .option("--ref <image>", "reference image that anchors the subject (image conditioning)")
+  .option("-b, --backend <name>", "image backend: replicate | gpt-image")
   .description("Generate, critique, and revise until the shot satisfies the contract")
-  .action(async (descriptionParts: string[], opts: { rounds?: string; candidates?: string; seed?: string; ref?: string }) => {
+  .action(
+    async (
+      descriptionParts: string[],
+      opts: { rounds?: string; candidates?: string; seed?: string; ref?: string; backend?: string },
+    ) => {
     const projectDir = program.opts<{ dir: string }>().dir;
     const config = loadConfig();
     if (opts.rounds) config.maxRounds = Number.parseInt(opts.rounds, 10);
     if (opts.candidates) config.candidatesPerRound = Number.parseInt(opts.candidates, 10);
+    if (opts.backend) config.backend = opts.backend;
     const baseSeed = opts.seed !== undefined ? Number.parseInt(opts.seed, 10) : undefined;
     const contract = readContract(projectDir);
-    const backend = createReplicateBackend({
-      draftModel: config.draftModel,
-      finalModel: config.finalModel,
-      refDraftModel: config.refDraftModel,
-    });
+    const backend = createBackend(config);
     const reference = loadReference(projectDir, opts.ref);
 
     const result = await shoot(
@@ -114,16 +111,14 @@ program
   .command("campaign")
   .argument("<shotsFile>", "file with one shot description per line (# comments allowed)")
   .option("--ref <image>", "reference image applied to every shot in the campaign")
+  .option("-b, --backend <name>", "image backend: replicate | gpt-image")
   .description("Shoot every line under one contract, then audit the set for consistency")
-  .action(async (shotsFile: string, opts: { ref?: string }) => {
+  .action(async (shotsFile: string, opts: { ref?: string; backend?: string }) => {
     const projectDir = program.opts<{ dir: string }>().dir;
     const config = loadConfig();
+    if (opts.backend) config.backend = opts.backend;
     const contract = readContract(projectDir);
-    const backend = createReplicateBackend({
-      draftModel: config.draftModel,
-      finalModel: config.finalModel,
-      refDraftModel: config.refDraftModel,
-    });
+    const backend = createBackend(config);
     const reference = loadReference(projectDir, opts.ref);
 
     const result = await runCampaign({ config, backend, contract, projectDir, log, reference }, shotsFile);
@@ -147,6 +142,23 @@ program
     log(`\nAudit complete: ${result.campaignDir}`);
     log(`  Report: ${path.join(result.campaignDir, "report.md")}`);
     log(`  Sheet:  ${path.join(result.campaignDir, "campaign-sheet.html")}`);
+  });
+
+program
+  .command("rerender")
+  .argument("<shotDir>", "an existing shot directory with a shipped final")
+  .option("-b, --backend <name>", "image backend to re-render on: replicate | gpt-image")
+  .description("Re-render a shipped final on another backend under the same contract, and compare")
+  .action(async (shotDir: string, opts: { backend?: string }) => {
+    const projectDir = program.opts<{ dir: string }>().dir;
+    const config = loadConfig();
+    if (opts.backend) config.backend = opts.backend;
+    const contract = readContract(projectDir);
+    const backend = createBackend(config);
+
+    const result = await rerender({ config, backend, contract, projectDir, log }, shotDir);
+    log(`\nRe-render complete: ${result.outDir}`);
+    log(`  Report: ${path.join(result.outDir, "report.md")}`);
   });
 
 program

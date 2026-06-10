@@ -367,6 +367,60 @@ ${measuredDrift}`,
 }
 
 // ---------------------------------------------------------------------------
+// Cross-model comparison — same contract, two renders
+
+const RenderComparisonSchema = z.object({
+  verdict: z
+    .enum(["original", "rerender", "tie"])
+    .describe("Which render satisfies the Style Contract better"),
+  differences: z.array(z.string()).describe("Concrete visual differences, most consequential first"),
+  advice: z
+    .string()
+    .describe("Guidance: which to ship, or what prompt tweak would close the gap on the weaker one"),
+});
+
+export type RenderComparison = z.infer<typeof RenderComparisonSchema>;
+
+export async function compareRenders(
+  model: string,
+  contract: StyleContract,
+  shotDescription: string,
+  original: Buffer,
+  rerendered: Buffer,
+  measured: string,
+): Promise<RenderComparison> {
+  return directorCall({
+    model,
+    system: SYSTEM,
+    schema: RenderComparisonSchema,
+    schemaName: "render_comparison",
+    content: [
+      textBlock(
+        `The same shot was rendered twice under the same Style Contract — the ORIGINAL on one image
+model, the RE-RENDER on another. Compare them strictly against the contract: palette, mood,
+composition, lighting, NEVER rules, technical quality. Differences in model "style" only matter
+where the contract takes a side.
+
+Measured values are computed pixel data, not opinion — weigh them accordingly.
+
+STYLE CONTRACT:
+${contractRubric(contract)}
+
+SHOT BRIEF:
+${shotDescription}
+
+MEASURED:
+${measured}`,
+      ),
+      textBlock("ORIGINAL:"),
+      imageBlock(original),
+      textBlock("RE-RENDER:"),
+      imageBlock(rerendered),
+    ],
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Revision
 
 const RevisedPromptSchema = z.object({

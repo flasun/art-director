@@ -11,6 +11,7 @@ const MANIFEST: ShotManifest = {
   baseSeed: 123456,
   contractVersion: 1,
   referenceFile: "refs/product.png",
+  finalModelId: "black-forest-labs/flux-1.1-pro",
   rounds: [
     {
       round: 1,

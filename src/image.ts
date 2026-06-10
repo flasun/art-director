@@ -29,3 +29,22 @@ export function downscalePng(buffer: Buffer, maxEdge: number): Buffer {
 export function pngDataUri(buffer: Buffer): string {
   return `data:image/png;base64,${buffer.toString("base64")}`;
 }
+
+/**
+ * Center-crops to the contract aspect. Used for backends that render at
+ * fixed sizes (gpt-image) so deliverables still honor the contract.
+ */
+export function cropToAspect(buffer: Buffer, aspect: string): Buffer {
+  const [aw, ah] = aspect.split(":").map(Number) as [number, number];
+  const target = aw / ah;
+  const src = PNG.sync.read(buffer);
+  const current = src.width / src.height;
+  if (Math.abs(current - target) / target < 0.005) return buffer;
+  let width = src.width;
+  let height = src.height;
+  if (current > target) width = Math.round(src.height * target);
+  else height = Math.round(src.width / target);
+  const out = new PNG({ width, height });
+  PNG.bitblt(src, out, Math.floor((src.width - width) / 2), Math.floor((src.height - height) / 2), width, height, 0, 0);
+  return PNG.sync.write(out);
+}
