@@ -26,7 +26,8 @@
 
 ## v2 — sets, not shots
 
-- [ ] Campaign mode: N shots sharing one contract, set-level consistency audit (pairwise drift, palette histograms across the set)
+- [x] Campaign mode: `campaign <shotsFile>` shoots N descriptions under one contract, then audits the set
+- [x] Set-level consistency audit: pairwise CIELAB palette drift + tonal deviation (measured) feeding a directed set critique with verdict/outliers/advice; standalone `audit <shotDirs...>`
 - [ ] Reference images / image conditioning where backends support it (character & product sheets)
 - [ ] More backends behind the dialect adapter: gpt-image, SDXL/ComfyUI, fal
 - [ ] Cross-model re-rendering: same contract, new backend, automated diff report
