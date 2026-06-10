@@ -55,6 +55,72 @@ ${sections}
 `;
 }
 
+export interface CampaignSheetMember {
+  id: string;
+  file: string;
+  outlier: boolean;
+  issue?: string;
+}
+
+const SET_VERDICT_COLORS: Record<string, string> = {
+  coherent: "#1B7F4B",
+  drifting: "#B07D1A",
+  broken: "#A33232",
+};
+
+/** Grid of campaign finals with the set-level judgement. */
+export function renderCampaignSheet(
+  campaignName: string,
+  setVerdict: string,
+  members: CampaignSheetMember[],
+  details: { unifiers: string[]; advice: string },
+): string {
+  const cards = members
+    .map(
+      (m) => `<figure class="card${m.outlier ? " outlier" : ""}">
+  <img src="${escapeHtml(m.file)}" alt="${escapeHtml(m.id)}" loading="lazy" />
+  <figcaption>
+    <strong>${escapeHtml(m.id)}</strong>
+    ${m.outlier ? `<span class="badge">outlier</span>` : ""}
+    ${m.issue ? `<p class="issue">${escapeHtml(m.issue)}</p>` : ""}
+  </figcaption>
+</figure>`,
+    )
+    .join("\n");
+  const unifiers = details.unifiers.map((u) => `<li>${escapeHtml(u)}</li>`).join("");
+  const verdictColor = SET_VERDICT_COLORS[setVerdict] ?? "#666";
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Campaign — ${escapeHtml(campaignName)}</title>
+<style>
+  body { font-family: Georgia, serif; background: #181818; color: #EDEAE2; margin: 2rem auto; max-width: 1100px; padding: 0 1rem; }
+  h1 { font-weight: normal; font-style: italic; }
+  .verdict { color: #fff; border-radius: 3px; padding: .15rem .55rem; text-transform: uppercase; letter-spacing: .05em; font-size: .85rem; background: ${verdictColor}; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+  .card { margin: 0; background: #222; border-radius: 6px; overflow: hidden; border: 2px solid transparent; }
+  .card.outlier { border-color: #A33232; }
+  .card img { width: 100%; display: block; }
+  figcaption { padding: .6rem .8rem; font-size: .85rem; }
+  .badge { background: #A33232; color: #fff; border-radius: 3px; padding: .05rem .4rem; font-size: .72rem; text-transform: uppercase; margin-left: .4rem; }
+  .issue { color: #E07B7B; margin: .35rem 0 0; }
+  ul { color: #CFCABD; }
+  .advice { color: #B9B4A7; }
+</style>
+</head>
+<body>
+<h1>Campaign — ${escapeHtml(campaignName)}</h1>
+<p>Set verdict: <span class="verdict">${escapeHtml(setVerdict)}</span></p>
+${unifiers ? `<ul>${unifiers}</ul>` : ""}
+${details.advice ? `<p class="advice"><strong>Advice:</strong> ${escapeHtml(details.advice)}</p>` : ""}
+<div class="grid">${cards}</div>
+</body>
+</html>
+`;
+}
+
 const VERDICT_COLORS: Record<string, string> = {
   ship: "#1B7F4B",
   revise: "#B07D1A",

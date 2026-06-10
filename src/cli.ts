@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Command } from "commander";
 import { createReplicateBackend } from "./backends/replicate.js";
+import { auditShots, runCampaign } from "./campaign.js";
 import { runChecks } from "./checks.js";
 import { loadConfig } from "./config.js";
 import { serializeContract } from "./contract.js";
@@ -88,6 +89,39 @@ program
     log(`direction.md v${contract.version} -> v${result.contract.version}: ${result.summary}`);
     for (const change of result.changes) log(`  · ${change}`);
     log("Previous version lives in git history — diff it to review the amendment.");
+  });
+
+program
+  .command("campaign")
+  .argument("<shotsFile>", "file with one shot description per line (# comments allowed)")
+  .description("Shoot every line under one contract, then audit the set for consistency")
+  .action(async (shotsFile: string) => {
+    const projectDir = program.opts<{ dir: string }>().dir;
+    const config = loadConfig();
+    const contract = readContract(projectDir);
+    const backend = createReplicateBackend({ draftModel: config.draftModel, finalModel: config.finalModel });
+
+    const result = await runCampaign({ config, backend, contract, projectDir, log }, shotsFile);
+    log(`\nCampaign complete: ${result.campaignDir}`);
+    log(`  Report: ${path.join(result.campaignDir, "report.md")}`);
+    log(`  Sheet:  ${path.join(result.campaignDir, "campaign-sheet.html")}`);
+    log(`  Spend:  ${renderUsage(result.usage)}`);
+  });
+
+program
+  .command("audit")
+  .argument("<shotDirs...>", "existing shot directories whose finals form the set")
+  .option("-n, --name <name>", "campaign name for the report", "set-audit")
+  .description("Audit existing finals as a set — do they read as one campaign?")
+  .action(async (shotDirs: string[], opts: { name: string }) => {
+    const projectDir = program.opts<{ dir: string }>().dir;
+    const config = loadConfig();
+    const contract = readContract(projectDir);
+
+    const result = await auditShots({ config, contract, projectDir, log }, shotDirs, opts.name);
+    log(`\nAudit complete: ${result.campaignDir}`);
+    log(`  Report: ${path.join(result.campaignDir, "report.md")}`);
+    log(`  Sheet:  ${path.join(result.campaignDir, "campaign-sheet.html")}`);
   });
 
 program

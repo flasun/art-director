@@ -68,13 +68,21 @@ export function slugify(text: string): string {
   );
 }
 
-export function createShotDir(projectDir: string, shotDescription: string): string {
+function createDatedDir(parent: string, name: string): string {
   const date = new Date().toISOString().slice(0, 10);
-  const base = `${date}-${slugify(shotDescription)}`;
-  let dir = path.join(projectDir, "shots", base);
+  const base = `${date}-${slugify(name)}`;
+  let dir = path.join(parent, base);
   for (let n = 2; fs.existsSync(dir); n++) {
-    dir = path.join(projectDir, "shots", `${base}-${n}`);
+    dir = path.join(parent, `${base}-${n}`);
   }
   fs.mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+export function createShotDir(projectDir: string, shotDescription: string): string {
+  return createDatedDir(path.join(projectDir, "shots"), shotDescription);
+}
+
+export function createCampaignDir(projectDir: string, campaignName: string): string {
+  return createDatedDir(path.join(projectDir, "campaigns"), campaignName);
 }

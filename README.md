@@ -14,14 +14,19 @@ A project is just a directory in git:
 my-campaign/
 ├── brief.md            # what you told the director
 ├── direction.md        # the Style Contract — the source of truth
-└── shots/
-    └── 2026-06-09-hero-banner/
-        ├── round-1/r1-c1.png ...   # draft candidates
-        ├── round-2/...
-        ├── critique.md             # the director's reasoning, human-readable
-        ├── decisions.jsonl         # every keep/kill with reasons (machine-readable)
-        ├── contact-sheet.html      # annotated grid of every round
-        └── final.png               # the shipped asset
+├── shots/
+│   └── 2026-06-09-hero-banner/
+│       ├── round-1/r1-c1.png ...   # draft candidates
+│       ├── round-2/...
+│       ├── critique.md             # the director's reasoning, human-readable
+│       ├── decisions.jsonl         # every keep/kill with reasons (machine-readable)
+│       ├── shot.json               # manifest: prompts, seeds, contract version
+│       ├── contact-sheet.html      # annotated grid of every round
+│       └── final.png               # the shipped asset
+└── campaigns/
+    └── 2026-06-10-spring/
+        ├── report.md               # set verdict, outliers, measured drift, spend
+        └── campaign-sheet.html     # the finals side by side, outliers flagged
 ```
 
 Everything is a file, so git gives you versioned creative history for free: a diff on `direction.md` is a meaningful design change, and a pull request is a creative review.
@@ -59,6 +64,8 @@ You can also `npm run build` and use the `art-director` bin directly.
 | `shoot <description>` | Generate → critique → revise loop, then a full-quality final render |
 | `amend <feedback>` | Fold feedback into the contract: `amend "warmer light" --ref liked.png` bumps the version, changes only what the feedback demands |
 | `recritique <shotDir>` | Re-judge an existing shoot against the current contract — no re-rendering. The natural follow-up to `amend` |
+| `campaign <shotsFile>` | Shoot every line of a file under one contract, then audit the finals as a set |
+| `audit <shotDirs...>` | Set-audit existing finals: do they read as one campaign? Writes `campaigns/<date>/report.md` + sheet |
 | `critique <images...>` | Judge existing images against the Style Contract |
 
 Global flag: `-C, --dir <dir>` selects the project directory. `shoot` takes `--rounds` and `--candidates` to override the budget, and `--seed` to reproduce a previous shoot exactly (every shoot logs its base seed). Each shoot also records its spend — director tokens and render counts — in `critique.md`.

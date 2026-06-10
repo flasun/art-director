@@ -24,6 +24,14 @@ export function addRender(tally: UsageTally, quality: "draft" | "final"): void {
   else tally.finalRenders += 1;
 }
 
+export function addTally(into: UsageTally, from: UsageTally): void {
+  into.claudeCalls += from.claudeCalls;
+  into.inputTokens += from.inputTokens;
+  into.outputTokens += from.outputTokens;
+  into.draftRenders += from.draftRenders;
+  into.finalRenders += from.finalRenders;
+}
+
 export function renderUsage(tally: UsageTally): string {
   const tokens = `${tally.inputTokens.toLocaleString("en-US")} in / ${tally.outputTokens.toLocaleString("en-US")} out`;
   return `${tally.claudeCalls} director calls (${tokens} tokens), ${tally.draftRenders} draft + ${tally.finalRenders} final renders`;

@@ -283,6 +283,67 @@ ${shotDescription}`,
 }
 
 // ---------------------------------------------------------------------------
+// Set audit — do N finals read as one campaign?
+
+const SetAuditSchema = z.object({
+  setVerdict: z
+    .enum(["coherent", "drifting", "broken"])
+    .describe("coherent = reads as one campaign; drifting = mostly unified with leaks; broken = no shared identity"),
+  unifiers: z.array(z.string()).describe("What visually holds the set together"),
+  breaks: z.array(
+    z.object({
+      shot: z.string().describe("The shot id exactly as given"),
+      issue: z.string().describe("What pulls this shot away from the set"),
+    }),
+  ),
+  outliers: z.array(z.string()).describe("Shot ids that visually leave the set, worst first"),
+  advice: z.string().describe("How to bring the set together; empty if coherent"),
+});
+
+export type SetAudit = z.infer<typeof SetAuditSchema>;
+
+export async function auditSet(
+  model: string,
+  contract: StyleContract,
+  members: { id: string; png: Buffer }[],
+  measuredDrift: string,
+): Promise<SetAudit> {
+  const content = [
+    textBlock(
+      `These finals were produced as ONE campaign under the Style Contract below. Audit the SET,
+not the individual images: would a stranger flipping past them say they belong together?
+Judge palette unity, tonal key, lighting character, composition rhythm, and subject treatment.
+Name what unifies, what breaks, and which shots leave the set.
+
+Measured drift is computed pixel data, not opinion — weigh it accordingly.
+
+STYLE CONTRACT:
+${contractRubric(contract)}
+
+MEASURED DRIFT:
+${measuredDrift}`,
+    ),
+  ];
+  for (const member of members) {
+    content.push(textBlock(`Shot "${member.id}":`), imageBlock(member.png));
+  }
+
+  const result = await directorCall({
+    model,
+    system: SYSTEM,
+    schema: SetAuditSchema,
+    schemaName: "set_audit",
+    content,
+  });
+  const ids = new Set(members.map((m) => m.id));
+  return {
+    ...result,
+    outliers: result.outliers.filter((id) => ids.has(id)),
+    breaks: result.breaks.filter((b) => ids.has(b.shot)),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Revision
 
 const RevisedPromptSchema = z.object({
