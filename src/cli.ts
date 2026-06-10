@@ -25,6 +25,13 @@ import type { Candidate } from "./types.js";
 import { renderUsage } from "./usage.js";
 import { parseIntInRange, readPngFile } from "./validate.js";
 
+// Load ./.env so the documented `cp .env.example .env` flow works.
+try {
+  process.loadEnvFile?.();
+} catch {
+  // No .env file — exported environment variables still apply.
+}
+
 const log = (message: string) => console.log(message);
 
 // Exit quietly when output is piped to a consumer that closes early (head, grep -m).
