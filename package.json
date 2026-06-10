@@ -1,0 +1,36 @@
+{
+  "name": "art-director",
+  "version": "0.1.0",
+  "description": "An AI art director: turns a brief into an enforceable visual language, then directs image models until the work is on-brand.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "art-director": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
+    "commander": "^14.0.2",
+    "pngjs": "^7.0.0",
+    "yaml": "^2.8.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.3",
+    "@types/pngjs": "^6.0.5",
+    "tsx": "^4.20.7",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

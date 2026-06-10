@@ -1,0 +1,325 @@
+import { z } from "zod";
+import { directorCall, imageBlock, textBlock } from "./claude.js";
+import { contractRubric, normalizeHex, parseContract, serializeContract } from "./contract.js";
+import type { Candidate, CritiqueResult, StyleContract } from "./types.js";
+
+const SYSTEM = `You are a seasoned art director with exacting taste. You turn vague client
+language into explicit, enforceable visual direction, and you judge work against the brief —
+not against your personal preferences. You are decisive: every judgement comes with concrete,
+visual reasons a junior could act on. You never pad, hedge, or flatter.`;
+
+// ---------------------------------------------------------------------------
+// Creative interview
+
+const InterviewQuestionsSchema = z.object({
+  questions: z.array(
+    z.object({
+      dimension: z.string().describe("The visual dimension this probes, e.g. 'color temperature'"),
+      question: z.string().describe("A short forced-choice question"),
+      optionA: z.string().describe("First option, described vividly in one sentence"),
+      optionB: z.string().describe("Second option, described vividly in one sentence"),
+    }),
+  ),
+});
+
+export type InterviewQuestions = z.infer<typeof InterviewQuestionsSchema>;
+
+export async function generateInterview(model: string, brief: string): Promise<InterviewQuestions> {
+  return directorCall({
+    model,
+    system: SYSTEM,
+    schema: InterviewQuestionsSchema,
+    schemaName: "interview_questions",
+    content: [
+      textBlock(
+        `Read this creative brief, then design exactly 6 forced-choice questions that will pin down
+the client's taste. Each question must probe a DIFFERENT visual dimension (e.g. color temperature,
+palette saturation, composition density, lighting character, medium/texture, era/reference).
+Options must be concrete and visual — something the client can picture — never abstract labels.
+Cover the dimensions the brief leaves most ambiguous.
+
+BRIEF:
+${brief}`,
+      ),
+    ],
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Drafting the Style Contract
+
+const DirectionDraftSchema = z.object({
+  name: z.string(),
+  essence: z.string().describe("One line that captures the visual identity"),
+  medium: z.string().describe("e.g. 'editorial photography', 'flat vector illustration'"),
+  aspect: z.string().describe("Primary aspect ratio like '4:5' or '16:9'"),
+  palette: z.array(
+    z.object({
+      hex: z.string().describe("Six-digit hex like #E8DCC8"),
+      role: z.string().describe("background | primary | accent | shadow | highlight"),
+      name: z.string().describe("Evocative color name"),
+    }),
+  ),
+  never: z.array(z.string()).describe("Hard rules — things that must never appear"),
+  mood: z.string(),
+  composition: z.string(),
+  lightingAndLens: z.string(),
+  subjectTreatment: z.string(),
+  notes: z.string(),
+});
+
+type DirectionDraft = z.infer<typeof DirectionDraftSchema>;
+
+/**
+ * Converts a director-produced draft into a validated StyleContract:
+ * normalizes hexes, falls back on a bad aspect, and round-trips through
+ * the serializer so a draft that can't parse never reaches disk.
+ */
+export function toContract(draft: DirectionDraft, version: number): StyleContract {
+  const contract: StyleContract = {
+    version,
+    name: draft.name,
+    essence: draft.essence,
+    medium: draft.medium,
+    aspect: /^\d+:\d+$/.test(draft.aspect) ? draft.aspect : "4:5",
+    palette: draft.palette.map((c) => ({ ...c, hex: normalizeHex(c.hex) })),
+    never: draft.never,
+    body: {
+      mood: draft.mood,
+      composition: draft.composition,
+      lightingAndLens: draft.lightingAndLens,
+      subjectTreatment: draft.subjectTreatment,
+      notes: draft.notes,
+    },
+  };
+  return parseContract(serializeContract(contract));
+}
+
+export async function draftDirection(
+  model: string,
+  brief: string,
+  interviewTranscript: string,
+): Promise<StyleContract> {
+  const draft = await directorCall({
+    model,
+    system: SYSTEM,
+    schema: DirectionDraftSchema,
+    schemaName: "style_contract_draft",
+    content: [
+      textBlock(
+        `Draft a Style Contract from this brief and interview. The contract is the project's single
+source of truth: every field must be specific enough to enforce in a critique. 4-6 palette colors
+with real hex values that work together. 3-6 "never" rules that protect the identity. Body sections
+are directorial guidance written for a production artist — concrete nouns, no marketing language.
+
+BRIEF:
+${brief}
+
+CREATIVE INTERVIEW (the client's forced choices reveal their taste):
+${interviewTranscript}`,
+      ),
+    ],
+  });
+
+  return toContract(draft, 1);
+}
+
+// ---------------------------------------------------------------------------
+// Amending the contract from feedback — the taste-learning loop
+
+const AmendmentSchema = z.object({
+  summary: z.string().describe("One line: what changed and why"),
+  changes: z.array(z.string()).describe("Each concrete edit made, traceable to the feedback"),
+  contract: DirectionDraftSchema,
+});
+
+export async function amendDirection(
+  model: string,
+  current: StyleContract,
+  feedback: string,
+  referenceImages: Buffer[],
+): Promise<{ contract: StyleContract; summary: string; changes: string[] }> {
+  const content = [
+    textBlock(
+      `Amend this Style Contract based on client feedback. Change ONLY what the feedback demands —
+every field the feedback does not touch must be preserved verbatim, including hex values and
+phrasing. If reference images are attached, they show what the client is pointing at: identify
+what makes them distinct from the current contract (palette temperature, light, density, texture)
+and fold THAT into the contract — do not describe the images, extract the underlying rule.
+
+CURRENT STYLE CONTRACT:
+${serializeContract(current)}
+
+CLIENT FEEDBACK:
+${feedback}`,
+    ),
+    ...referenceImages.map((img) => imageBlock(img)),
+  ];
+
+  const result = await directorCall({
+    model,
+    system: SYSTEM,
+    schema: AmendmentSchema,
+    schemaName: "contract_amendment",
+    content,
+  });
+
+  return {
+    contract: toContract(result.contract, current.version + 1),
+    summary: result.summary,
+    changes: result.changes,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Compiling the contract into a backend prompt
+
+const CompiledPromptSchema = z.object({
+  prompt: z.string(),
+  rationale: z.string().describe("One or two sentences on the key choices"),
+});
+
+export async function compilePrompt(
+  model: string,
+  contract: StyleContract,
+  shotDescription: string,
+  dialect: string,
+): Promise<{ prompt: string; rationale: string }> {
+  return directorCall({
+    model,
+    system: SYSTEM,
+    schema: CompiledPromptSchema,
+    schemaName: "compiled_prompt",
+    content: [
+      textBlock(
+        `Compile this Style Contract and shot description into ONE generation prompt.
+The prompt must bake in the contract's palette, lighting, composition and mood so faithfully
+that a model that has never seen the contract still produces on-brand work.
+
+BACKEND DIALECT:
+${dialect}
+
+STYLE CONTRACT:
+${contractRubric(contract)}
+
+SHOT TO PRODUCE:
+${shotDescription}`,
+      ),
+    ],
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Critique
+
+const CritiqueSchema = z.object({
+  critiques: z.array(
+    z.object({
+      candidate: z.string().describe("The candidate id exactly as given"),
+      paletteNotes: z.string(),
+      compositionNotes: z.string(),
+      moodNotes: z.string(),
+      neverViolations: z.array(z.string()).describe("Violated NEVER rules, empty if none"),
+      technicalFlaws: z.array(z.string()).describe("Render defects: anatomy, text artifacts, perspective"),
+      verdict: z.enum(["ship", "revise", "kill"]),
+      reasons: z.array(z.string()).describe("Concrete visual reasons for the verdict"),
+    }),
+  ),
+  ranking: z
+    .array(z.string())
+    .describe("Candidate ids ordered best-first by contract fit, excluding kills"),
+  revisionAdvice: z
+    .string()
+    .describe("How the prompt should change for the next round; empty if a candidate ships"),
+});
+
+export async function critiqueCandidates(
+  model: string,
+  contract: StyleContract,
+  shotDescription: string,
+  candidates: { candidate: Candidate; png: Buffer }[],
+): Promise<CritiqueResult> {
+  const content = [
+    textBlock(
+      `Critique each candidate against the Style Contract. Judge contract fit, not generic
+prettiness. A NEVER violation or a visible technical flaw means the candidate cannot ship.
+Verdicts: "ship" = on-brand and technically clean as-is; "revise" = right direction, fixable
+via prompt changes; "kill" = wrong direction or disqualified.
+Rank by pairwise comparison: for each pair, ask which better satisfies the contract.
+
+Measured palette adherence is computed pixel data, not opinion — weigh it accordingly
+(100 = dominant colors sit exactly on the contract palette).
+
+STYLE CONTRACT:
+${contractRubric(contract)}
+
+SHOT BRIEF:
+${shotDescription}`,
+    ),
+  ];
+  for (const { candidate, png } of candidates) {
+    content.push(
+      textBlock(
+        `Candidate "${candidate.id}" — measured palette adherence ${candidate.checks.palette.adherence}/100, ` +
+          `dominant colors ${candidate.checks.palette.dominant.map((d) => `${d.hex} (ΔE ${d.deltaE} from ${d.nearestContractHex})`).join(", ")}, ` +
+          `tone ${candidate.checks.tone.key} key / ${candidate.checks.tone.contrast} contrast, ` +
+          `aspect ${candidate.checks.aspect.ok ? "OK" : `WRONG (${candidate.checks.aspect.actual}, expected ${candidate.checks.aspect.expected})`}:`,
+      ),
+      imageBlock(png),
+    );
+  }
+
+  const result = await directorCall({
+    model,
+    system: SYSTEM,
+    schema: CritiqueSchema,
+    schemaName: "critique",
+    content,
+  });
+
+  const ids = new Set(candidates.map((c) => c.candidate.id));
+  const ranking = result.ranking.filter((id) => ids.has(id));
+  return { ...result, ranking };
+}
+
+// ---------------------------------------------------------------------------
+// Revision
+
+const RevisedPromptSchema = z.object({
+  prompt: z.string(),
+  changes: z.array(z.string()).describe("Each change made and which critique point it addresses"),
+});
+
+export async function revisePrompt(
+  model: string,
+  contract: StyleContract,
+  currentPrompt: string,
+  critique: CritiqueResult,
+  dialect: string,
+): Promise<{ prompt: string; changes: string[] }> {
+  return directorCall({
+    model,
+    system: SYSTEM,
+    schema: RevisedPromptSchema,
+    schemaName: "revised_prompt",
+    content: [
+      textBlock(
+        `Revise the generation prompt to address the critique. Change only what the critique
+demands — keep everything that is working. Every change must trace to a critique point and
+stay inside the Style Contract.
+
+BACKEND DIALECT:
+${dialect}
+
+STYLE CONTRACT:
+${contractRubric(contract)}
+
+CURRENT PROMPT:
+${currentPrompt}
+
+CRITIQUE OF THE LATEST ROUND:
+${JSON.stringify(critique, null, 2)}`,
+      ),
+    ],
+  });
+}
