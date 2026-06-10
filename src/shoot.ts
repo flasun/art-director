@@ -128,6 +128,7 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
   }
 
   let finalFile: string | null = null;
+  let finalModelId: string | null = null;
   const winner = shipped ?? best;
   if (winner) {
     log(`Rendering final at full quality (seed ${winner.candidate.seed})...`);
@@ -141,6 +142,7 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
       });
       finalRenders += 1;
       finalFile = "final.png";
+      finalModelId = final.modelId;
       fs.writeFileSync(path.join(shotDir, finalFile), final.buffer);
     } catch (error) {
       // The draft winner is still a usable deliverable — keep it rather than failing the shoot.
@@ -164,6 +166,7 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
     baseSeed,
     contractVersion: contract.version,
     referenceFile: reference?.file ?? null,
+    finalModelId,
     rounds: rounds.map((r) => ({
       round: r.round,
       prompt: r.prompt,

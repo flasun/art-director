@@ -5,6 +5,7 @@ import { getClaudeUsage, resetClaudeUsage } from "./claude.js";
 import { renderContactSheet } from "./contactsheet.js";
 import { readShotManifest, writeShootRecords } from "./decisions.js";
 import { critiqueCandidates } from "./director.js";
+import { loadReferencePng } from "./project.js";
 import type { Candidate, CritiqueResult, RoundRecord, StyleContract } from "./types.js";
 
 interface RecritiqueDeps {
@@ -12,16 +13,6 @@ interface RecritiqueDeps {
   contract: StyleContract;
   projectDir: string;
   log: (message: string) => void;
-}
-
-function loadReference(deps: RecritiqueDeps, referenceFile: string | null | undefined): Buffer | undefined {
-  if (!referenceFile) return undefined;
-  const referencePath = path.resolve(deps.projectDir, referenceFile);
-  if (!fs.existsSync(referencePath)) {
-    deps.log(`  Reference ${referenceFile} from the manifest is missing — judging without it.`);
-    return undefined;
-  }
-  return fs.readFileSync(referencePath);
 }
 
 /**
@@ -51,7 +42,7 @@ export async function recritique(deps: RecritiqueDeps, shotDirArg: string): Prom
     `Re-judging ${all.length} candidates from "${manifest.shotDescription}" ` +
       `against direction.md v${contract.version} (was v${manifest.contractVersion})...`,
   );
-  const reference = loadReference(deps, manifest.referenceFile);
+  const reference = loadReferencePng(deps.projectDir, manifest.referenceFile, log);
   const critique = await critiqueCandidates(
     deps.directorModel,
     contract,

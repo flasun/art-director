@@ -64,11 +64,23 @@ You can also `npm run build` and use the `art-director` bin directly.
 | `shoot <description>` | Generate → critique → revise loop, then a full-quality final render. `--ref product.png` anchors the subject via image conditioning |
 | `amend <feedback>` | Fold feedback into the contract: `amend "warmer light" --ref liked.png` bumps the version, changes only what the feedback demands |
 | `recritique <shotDir>` | Re-judge an existing shoot against the current contract — no re-rendering. The natural follow-up to `amend` |
+| `rerender <shotDir> -b <backend>` | Re-render a shipped final on another backend under the same contract, with a director comparison report |
 | `campaign <shotsFile>` | Shoot every line of a file under one contract, then audit the finals as a set. `--ref` applies one reference to every shot |
 | `audit <shotDirs...>` | Set-audit existing finals: do they read as one campaign? Writes `campaigns/<date>/report.md` + sheet |
 | `critique <images...>` | Judge existing images against the Style Contract |
 
 Global flag: `-C, --dir <dir>` selects the project directory. `shoot` takes `--rounds` and `--candidates` to override the budget, and `--seed` to reproduce a previous shoot exactly (every shoot logs its base seed). Each shoot also records its spend — director tokens and render counts — in `critique.md`.
+
+## Backends
+
+The Style Contract compiles to per-model prompts through dialect adapters, so directions outlive any one image model. Select with `--backend` (or `ART_DIRECTOR_BACKEND`):
+
+| Backend | Models | Notes |
+|---|---|---|
+| `replicate` (default) | Flux schnell drafts, Flux 1.1-pro finals | Seeds honored; references via image conditioning per Flux family |
+| `gpt-image` | `gpt-image-1` | Instruction-following dialect; fixed render sizes are center-cropped to the contract aspect; **no seed control**; references go through the edits endpoint |
+
+`rerender shots/<dir> -b gpt-image` is the portability proof: the contract is recompiled for the new dialect, rendered once at full quality, and the director compares both finals against the contract — verdict, differences, and measured palette distance in `rerenders/<backend>/report.md`.
 
 ## How the loop judges work
 
@@ -86,6 +98,9 @@ Set in `.env` (see `.env.example`):
 | `REPLICATE_DRAFT_MODEL` | `black-forest-labs/flux-schnell` | Fast, cheap candidate renders |
 | `REPLICATE_FINAL_MODEL` | `black-forest-labs/flux-1.1-pro` | Full-quality final render |
 | `REPLICATE_REF_DRAFT_MODEL` | `black-forest-labs/flux-dev` | Swapped in for drafts when a `--ref` image needs conditioning support (flux-schnell can't take one) |
+| `ART_DIRECTOR_BACKEND` | `replicate` | Image backend: `replicate` or `gpt-image` |
+| `OPENAI_API_KEY` | — | Required only for the `gpt-image` backend |
+| `OPENAI_IMAGE_MODEL` | `gpt-image-1` | Model for the `gpt-image` backend |
 | `ART_DIRECTOR_ROUNDS` | `2` | Max critique rounds per shot |
 | `ART_DIRECTOR_CANDIDATES` | `4` | Candidates per round |
 

@@ -68,9 +68,8 @@ export function slugify(text: string): string {
   );
 }
 
-function createDatedDir(parent: string, name: string): string {
-  const date = new Date().toISOString().slice(0, 10);
-  const base = `${date}-${slugify(name)}`;
+/** First free directory named base, base-2, base-3... under parent. */
+export function uniqueChildDir(parent: string, base: string): string {
   let dir = path.join(parent, base);
   for (let n = 2; fs.existsSync(dir); n++) {
     dir = path.join(parent, `${base}-${n}`);
@@ -79,10 +78,30 @@ function createDatedDir(parent: string, name: string): string {
   return dir;
 }
 
+function createDatedDir(parent: string, name: string): string {
+  const date = new Date().toISOString().slice(0, 10);
+  return uniqueChildDir(parent, `${date}-${slugify(name)}`);
+}
+
 export function createShotDir(projectDir: string, shotDescription: string): string {
   return createDatedDir(path.join(projectDir, "shots"), shotDescription);
 }
 
 export function createCampaignDir(projectDir: string, campaignName: string): string {
   return createDatedDir(path.join(projectDir, "campaigns"), campaignName);
+}
+
+/** Loads a manifest-recorded reference image, warning instead of failing when it has moved. */
+export function loadReferencePng(
+  projectDir: string,
+  referenceFile: string | null | undefined,
+  warn: (message: string) => void,
+): Buffer | undefined {
+  if (!referenceFile) return undefined;
+  const referencePath = path.resolve(projectDir, referenceFile);
+  if (!fs.existsSync(referencePath)) {
+    warn(`  Reference ${referenceFile} from the manifest is missing — continuing without it.`);
+    return undefined;
+  }
+  return fs.readFileSync(referencePath);
 }

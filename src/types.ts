@@ -106,6 +106,8 @@ export interface ShotManifest {
   contractVersion: number;
   /** Reference image path relative to the project dir, when one anchored the shoot. */
   referenceFile?: string | null;
+  /** Model that rendered final.png, when the final render succeeded. */
+  finalModelId?: string | null;
   rounds: {
     round: number;
     prompt: string;

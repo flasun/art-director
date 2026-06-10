@@ -1,9 +1,12 @@
 export interface Config {
   directorModel: string;
+  /** Which image backend renders: "replicate" or "gpt-image". */
+  backend: string;
   draftModel: string;
   finalModel: string;
   /** Draft model used when a reference image needs conditioning support. */
   refDraftModel: string;
+  openaiImageModel: string;
   maxRounds: number;
   candidatesPerRound: number;
 }
@@ -21,6 +24,8 @@ function intEnv(name: string, fallback: number): number {
 export function loadConfig(): Config {
   return {
     directorModel: process.env.ART_DIRECTOR_MODEL ?? "claude-opus-4-8",
+    backend: process.env.ART_DIRECTOR_BACKEND ?? "replicate",
+    openaiImageModel: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1",
     draftModel: process.env.REPLICATE_DRAFT_MODEL ?? "black-forest-labs/flux-schnell",
     finalModel: process.env.REPLICATE_FINAL_MODEL ?? "black-forest-labs/flux-1.1-pro",
     refDraftModel: process.env.REPLICATE_REF_DRAFT_MODEL ?? "black-forest-labs/flux-dev",
