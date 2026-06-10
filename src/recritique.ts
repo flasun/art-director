@@ -10,7 +10,18 @@ import type { Candidate, CritiqueResult, RoundRecord, StyleContract } from "./ty
 interface RecritiqueDeps {
   directorModel: string;
   contract: StyleContract;
+  projectDir: string;
   log: (message: string) => void;
+}
+
+function loadReference(deps: RecritiqueDeps, referenceFile: string | null | undefined): Buffer | undefined {
+  if (!referenceFile) return undefined;
+  const referencePath = path.resolve(deps.projectDir, referenceFile);
+  if (!fs.existsSync(referencePath)) {
+    deps.log(`  Reference ${referenceFile} from the manifest is missing — judging without it.`);
+    return undefined;
+  }
+  return fs.readFileSync(referencePath);
 }
 
 /**
@@ -40,7 +51,14 @@ export async function recritique(deps: RecritiqueDeps, shotDirArg: string): Prom
     `Re-judging ${all.length} candidates from "${manifest.shotDescription}" ` +
       `against direction.md v${contract.version} (was v${manifest.contractVersion})...`,
   );
-  const critique = await critiqueCandidates(deps.directorModel, contract, manifest.shotDescription, all);
+  const reference = loadReference(deps, manifest.referenceFile);
+  const critique = await critiqueCandidates(
+    deps.directorModel,
+    contract,
+    manifest.shotDescription,
+    all,
+    reference,
+  );
 
   const byId = new Map(all.map((entry) => [entry.candidate.id, entry.candidate]));
   const rounds: RoundRecord[] = manifest.rounds.map((round, i) => {

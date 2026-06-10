@@ -28,7 +28,7 @@
 
 - [x] Campaign mode: `campaign <shotsFile>` shoots N descriptions under one contract, then audits the set
 - [x] Set-level consistency audit: pairwise CIELAB palette drift + tonal deviation (measured) feeding a directed set critique with verdict/outliers/advice; standalone `audit <shotDirs...>`
-- [ ] Reference images / image conditioning where backends support it (character & product sheets)
+- [x] Reference images: `shoot --ref` / `campaign --ref` condition generation (per-family Flux input mapping, auto-downscaled data URIs, draft-model swap) and make reference fidelity a hard critique criterion; recorded in `shot.json` so `recritique` reuses them
 - [ ] More backends behind the dialect adapter: gpt-image, SDXL/ComfyUI, fal
 - [ ] Cross-model re-rendering: same contract, new backend, automated diff report
 

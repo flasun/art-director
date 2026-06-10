@@ -8,7 +8,7 @@ import { readShotManifest } from "./decisions.js";
 import { auditSet, type SetAudit } from "./director.js";
 import { createCampaignDir } from "./project.js";
 import { computeSetDrift, renderDriftSummary, type SetDriftReport } from "./setaudit.js";
-import { shoot } from "./shoot.js";
+import { shoot, type ShootReference } from "./shoot.js";
 import type { StyleContract } from "./types.js";
 import { addTally, emptyTally, renderUsage, type UsageTally } from "./usage.js";
 
@@ -26,6 +26,8 @@ interface CampaignDeps {
   contract: StyleContract;
   projectDir: string;
   log: (message: string) => void;
+  /** Applied to every shot in the campaign (e.g. the product being sold). */
+  reference?: ShootReference;
 }
 
 interface AuditDeps {

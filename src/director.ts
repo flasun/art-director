@@ -184,17 +184,21 @@ export async function compilePrompt(
   contract: StyleContract,
   shotDescription: string,
   dialect: string,
+  reference?: Buffer,
 ): Promise<{ prompt: string; rationale: string }> {
-  return directorCall({
-    model,
-    system: SYSTEM,
-    schema: CompiledPromptSchema,
-    schemaName: "compiled_prompt",
-    content: [
-      textBlock(
-        `Compile this Style Contract and shot description into ONE generation prompt.
+  const content = [
+    textBlock(
+      `Compile this Style Contract and shot description into ONE generation prompt.
 The prompt must bake in the contract's palette, lighting, composition and mood so faithfully
-that a model that has never seen the contract still produces on-brand work.
+that a model that has never seen the contract still produces on-brand work.${
+        reference
+          ? `
+
+A REFERENCE IMAGE (attached) will be passed to the image model as conditioning: it anchors the
+subject. Describe the subject accurately but briefly — match what the reference shows — and spend
+most of the prompt on scene, lighting, palette and mood.`
+          : ""
+      }
 
 BACKEND DIALECT:
 ${dialect}
@@ -204,8 +208,15 @@ ${contractRubric(contract)}
 
 SHOT TO PRODUCE:
 ${shotDescription}`,
-      ),
-    ],
+    ),
+  ];
+  if (reference) content.push(imageBlock(reference));
+  return directorCall({
+    model,
+    system: SYSTEM,
+    schema: CompiledPromptSchema,
+    schemaName: "compiled_prompt",
+    content,
   });
 }
 
@@ -238,6 +249,7 @@ export async function critiqueCandidates(
   contract: StyleContract,
   shotDescription: string,
   candidates: { candidate: Candidate; png: Buffer }[],
+  reference?: Buffer,
 ): Promise<CritiqueResult> {
   const content = [
     textBlock(
@@ -245,7 +257,15 @@ export async function critiqueCandidates(
 prettiness. A NEVER violation or a visible technical flaw means the candidate cannot ship.
 Verdicts: "ship" = on-brand and technically clean as-is; "revise" = right direction, fixable
 via prompt changes; "kill" = wrong direction or disqualified.
-Rank by pairwise comparison: for each pair, ask which better satisfies the contract.
+Rank by pairwise comparison: for each pair, ask which better satisfies the contract.${
+        reference
+          ? `
+
+A REFERENCE IMAGE is attached first: the subject/product that must stay consistent. Treat
+fidelity to the reference as a hard criterion — a candidate whose subject visibly diverges
+from the reference cannot ship; note divergences in technicalFlaws.`
+          : ""
+      }
 
 Measured palette adherence is computed pixel data, not opinion — weigh it accordingly
 (100 = dominant colors sit exactly on the contract palette).
@@ -257,6 +277,9 @@ SHOT BRIEF:
 ${shotDescription}`,
     ),
   ];
+  if (reference) {
+    content.push(textBlock("REFERENCE (the subject that must stay consistent):"), imageBlock(reference));
+  }
   for (const { candidate, png } of candidates) {
     content.push(
       textBlock(

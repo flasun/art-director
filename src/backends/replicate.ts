@@ -1,7 +1,47 @@
 import { requireEnv } from "../config.js";
+import { downscalePng, pngDataUri } from "../image.js";
 import type { GeneratedImage, GenerateRequest, ImageBackend } from "./types.js";
 
 const API_BASE = "https://api.replicate.com/v1";
+const REFERENCE_MAX_EDGE = 768;
+
+export interface ReferenceBinding {
+  field: string;
+  extra?: Record<string, unknown>;
+}
+
+/**
+ * Which input field carries a reference image, per Flux family. A wrong
+ * guess for an exotic model surfaces as a Replicate 422 with the field
+ * name in the message — override the model via env if that happens.
+ */
+export function referenceBinding(model: string): ReferenceBinding | null {
+  if (model.includes("flux-schnell")) return null;
+  if (model.includes("flux-kontext")) return { field: "input_image" };
+  if (model.includes("flux-dev")) return { field: "image", extra: { prompt_strength: 0.8 } };
+  return { field: "image_prompt" };
+}
+
+export function buildPredictionInput(
+  model: string,
+  req: GenerateRequest,
+  referenceUri?: string,
+): Record<string, unknown> {
+  const input: Record<string, unknown> = {
+    prompt: req.prompt,
+    aspect_ratio: req.aspect,
+    output_format: "png",
+    seed: req.seed,
+  };
+  if (referenceUri) {
+    const binding = referenceBinding(model);
+    if (binding) {
+      input[binding.field] = referenceUri;
+      Object.assign(input, binding.extra);
+    }
+  }
+  return input;
+}
 
 interface Prediction {
   id: string;
@@ -47,7 +87,11 @@ async function awaitPrediction(first: Prediction, token: string): Promise<Predic
   return prediction;
 }
 
-export function createReplicateBackend(opts: { draftModel: string; finalModel: string }): ImageBackend {
+export function createReplicateBackend(opts: {
+  draftModel: string;
+  finalModel: string;
+  refDraftModel: string;
+}): ImageBackend {
   return {
     id: "replicate",
     dialect:
@@ -61,18 +105,18 @@ export function createReplicateBackend(opts: { draftModel: string; finalModel: s
         "REPLICATE_API_TOKEN",
         "Create a token at https://replicate.com/account/api-tokens and put it in .env",
       );
-      const model = req.quality === "draft" ? opts.draftModel : opts.finalModel;
+      let model = req.quality === "draft" ? opts.draftModel : opts.finalModel;
+      let referenceUri: string | undefined;
+      if (req.referenceImage) {
+        // Drafts default to flux-schnell, which can't take an image — swap
+        // in the reference-capable draft model so conditioning isn't lost.
+        if (referenceBinding(model) === null) model = opts.refDraftModel;
+        referenceUri = pngDataUri(downscalePng(req.referenceImage, REFERENCE_MAX_EDGE));
+      }
 
       const created = await replicateFetch(`${API_BASE}/models/${model}/predictions`, token, {
         method: "POST",
-        body: JSON.stringify({
-          input: {
-            prompt: req.prompt,
-            aspect_ratio: req.aspect,
-            output_format: "png",
-            seed: req.seed,
-          },
-        }),
+        body: JSON.stringify({ input: buildPredictionInput(model, req, referenceUri) }),
       });
       const done = await awaitPrediction(created, token);
 

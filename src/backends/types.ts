@@ -4,6 +4,8 @@ export interface GenerateRequest {
   aspect: string;
   seed: number;
   quality: "draft" | "final";
+  /** PNG to anchor the subject/style via image conditioning, where supported. */
+  referenceImage?: Buffer;
 }
 
 export interface GeneratedImage {

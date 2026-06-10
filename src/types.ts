@@ -104,6 +104,8 @@ export interface ShotManifest {
   shotDescription: string;
   baseSeed: number;
   contractVersion: number;
+  /** Reference image path relative to the project dir, when one anchored the shoot. */
+  referenceFile?: string | null;
   rounds: {
     round: number;
     prompt: string;
