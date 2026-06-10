@@ -37,5 +37,6 @@
 
 - [x] Taste memory across projects: `~/.art-director/taste.md` learned from interview choices and amendment feedback, read by interview/draft/amend (brief always outranks taste); `taste` command, `--no-taste`, `ART_DIRECTOR_TASTE=off`
 - [ ] Web UI over the same file format (the repo stays the database)
-- [ ] Figma export: push finals + the direction doc into a Figma library
+- [x] Figma-ready export (`export`): pure-SVG brand board + direction.md + finals gallery — the board drags into Figma as editable vectors
+- [ ] Native Figma push — blocked on a public design-write API (the REST API is read-only for file contents; needs a Figma plugin or Figma's MCP)
 - [ ] UI art direction module: screenshot audit against a Style Contract for interfaces (design tokens as the contract)
