@@ -27,14 +27,15 @@ describe("decodeImagesResponse", () => {
 });
 
 describe("createBackend registry", () => {
-  it("resolves both backends by id", () => {
+  it("resolves every backend by id", () => {
     const config = loadConfig();
-    expect(createBackend({ ...config, backend: "replicate" }).id).toBe("replicate");
-    expect(createBackend({ ...config, backend: "gpt-image" }).id).toBe("gpt-image");
+    for (const id of ["replicate", "gpt-image", "fal", "comfyui"]) {
+      expect(createBackend({ ...config, backend: id }).id).toBe(id);
+    }
   });
 
   it("rejects unknown backends with the available list", () => {
     const config = loadConfig();
-    expect(() => createBackend({ ...config, backend: "dall-e" })).toThrow(/replicate, gpt-image/);
+    expect(() => createBackend({ ...config, backend: "dall-e" })).toThrow(/replicate, gpt-image, fal, comfyui/);
   });
 });

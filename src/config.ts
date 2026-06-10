@@ -7,6 +7,13 @@ export interface Config {
   /** Draft model used when a reference image needs conditioning support. */
   refDraftModel: string;
   openaiImageModel: string;
+  falDraftModel: string;
+  falFinalModel: string;
+  /** fal image-to-image model swapped in when a reference is present. */
+  falRefModel: string;
+  comfyUrl: string;
+  /** Path to a ComfyUI API-format workflow with {{PROMPT}}/{{SEED}}/{{WIDTH}}/{{HEIGHT}} placeholders. */
+  comfyWorkflow: string | null;
   maxRounds: number;
   candidatesPerRound: number;
 }
@@ -29,6 +36,11 @@ export function loadConfig(): Config {
     draftModel: process.env.REPLICATE_DRAFT_MODEL ?? "black-forest-labs/flux-schnell",
     finalModel: process.env.REPLICATE_FINAL_MODEL ?? "black-forest-labs/flux-1.1-pro",
     refDraftModel: process.env.REPLICATE_REF_DRAFT_MODEL ?? "black-forest-labs/flux-dev",
+    falDraftModel: process.env.FAL_DRAFT_MODEL ?? "fal-ai/flux/schnell",
+    falFinalModel: process.env.FAL_FINAL_MODEL ?? "fal-ai/flux-pro/v1.1",
+    falRefModel: process.env.FAL_REF_MODEL ?? "fal-ai/flux/dev/image-to-image",
+    comfyUrl: process.env.COMFYUI_URL ?? "http://127.0.0.1:8188",
+    comfyWorkflow: process.env.COMFYUI_WORKFLOW ?? null,
     maxRounds: intEnv("ART_DIRECTOR_ROUNDS", 2),
     candidatesPerRound: intEnv("ART_DIRECTOR_CANDIDATES", 4),
   };
