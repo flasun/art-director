@@ -68,6 +68,33 @@ const DirectionDraftSchema = z.object({
   notes: z.string(),
 });
 
+type DirectionDraft = z.infer<typeof DirectionDraftSchema>;
+
+/**
+ * Converts a director-produced draft into a validated StyleContract:
+ * normalizes hexes, falls back on a bad aspect, and round-trips through
+ * the serializer so a draft that can't parse never reaches disk.
+ */
+export function toContract(draft: DirectionDraft, version: number): StyleContract {
+  const contract: StyleContract = {
+    version,
+    name: draft.name,
+    essence: draft.essence,
+    medium: draft.medium,
+    aspect: /^\d+:\d+$/.test(draft.aspect) ? draft.aspect : "4:5",
+    palette: draft.palette.map((c) => ({ ...c, hex: normalizeHex(c.hex) })),
+    never: draft.never,
+    body: {
+      mood: draft.mood,
+      composition: draft.composition,
+      lightingAndLens: draft.lightingAndLens,
+      subjectTreatment: draft.subjectTreatment,
+      notes: draft.notes,
+    },
+  };
+  return parseContract(serializeContract(contract));
+}
+
 export async function draftDirection(
   model: string,
   brief: string,
@@ -94,24 +121,54 @@ ${interviewTranscript}`,
     ],
   });
 
-  const contract: StyleContract = {
-    version: 1,
-    name: draft.name,
-    essence: draft.essence,
-    medium: draft.medium,
-    aspect: /^\d+:\d+$/.test(draft.aspect) ? draft.aspect : "4:5",
-    palette: draft.palette.map((c) => ({ ...c, hex: normalizeHex(c.hex) })),
-    never: draft.never,
-    body: {
-      mood: draft.mood,
-      composition: draft.composition,
-      lightingAndLens: draft.lightingAndLens,
-      subjectTreatment: draft.subjectTreatment,
-      notes: draft.notes,
-    },
+  return toContract(draft, 1);
+}
+
+// ---------------------------------------------------------------------------
+// Amending the contract from feedback — the taste-learning loop
+
+const AmendmentSchema = z.object({
+  summary: z.string().describe("One line: what changed and why"),
+  changes: z.array(z.string()).describe("Each concrete edit made, traceable to the feedback"),
+  contract: DirectionDraftSchema,
+});
+
+export async function amendDirection(
+  model: string,
+  current: StyleContract,
+  feedback: string,
+  referenceImages: Buffer[],
+): Promise<{ contract: StyleContract; summary: string; changes: string[] }> {
+  const content = [
+    textBlock(
+      `Amend this Style Contract based on client feedback. Change ONLY what the feedback demands —
+every field the feedback does not touch must be preserved verbatim, including hex values and
+phrasing. If reference images are attached, they show what the client is pointing at: identify
+what makes them distinct from the current contract (palette temperature, light, density, texture)
+and fold THAT into the contract — do not describe the images, extract the underlying rule.
+
+CURRENT STYLE CONTRACT:
+${serializeContract(current)}
+
+CLIENT FEEDBACK:
+${feedback}`,
+    ),
+    ...referenceImages.map((img) => imageBlock(img)),
+  ];
+
+  const result = await directorCall({
+    model,
+    system: SYSTEM,
+    schema: AmendmentSchema,
+    schemaName: "contract_amendment",
+    content,
+  });
+
+  return {
+    contract: toContract(result.contract, current.version + 1),
+    summary: result.summary,
+    changes: result.changes,
   };
-  // Round-trip through the serializer so a draft that can't parse never reaches disk.
-  return parseContract(serializeContract(contract));
 }
 
 // ---------------------------------------------------------------------------

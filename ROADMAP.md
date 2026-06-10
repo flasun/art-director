@@ -16,12 +16,12 @@
 
 ## v1 — a director you can argue with
 
-- [ ] `--feedback "more like r2-c3"`: diff what makes a candidate distinct, amend the contract
+- [x] `amend "<feedback>" --ref <image>`: fold feedback into the contract as a versioned amendment, changing only what the feedback demands
 - [ ] Render probe image pairs during the interview (visual forced choice, not textual)
-- [ ] Per-round seed pinning and `--seed` reuse for variations on a winner
+- [x] Per-round seed pinning and `--seed` reuse to reproduce a shoot
 - [ ] OCR/text-artifact deterministic check; contrast check
-- [ ] Cost accounting in the decision log (tokens + image spend per shot)
-- [ ] Resumable shoots; re-critique without re-rendering
+- [x] Cost accounting per shoot (director tokens + render counts in `critique.md` and the console)
+- [ ] Resumable shoots; re-critique without re-rendering (workaround: `critique shots/<dir>/round-*/*.png`)
 
 ## v2 — sets, not shots
 

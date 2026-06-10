@@ -5,11 +5,13 @@ import { Command } from "commander";
 import { createReplicateBackend } from "./backends/replicate.js";
 import { runChecks } from "./checks.js";
 import { loadConfig } from "./config.js";
-import { critiqueCandidates } from "./director.js";
+import { serializeContract } from "./contract.js";
+import { amendDirection, critiqueCandidates } from "./director.js";
 import { runInterview } from "./interview.js";
-import { initProject, readContract } from "./project.js";
+import { initProject, readContract, writeContract } from "./project.js";
 import { shoot } from "./shoot.js";
 import type { Candidate } from "./types.js";
+import { renderUsage } from "./usage.js";
 
 const log = (message: string) => console.log(message);
 
@@ -46,19 +48,41 @@ program
   .argument("<description...>", "what this shot should depict")
   .option("-r, --rounds <n>", "max critique rounds")
   .option("-c, --candidates <n>", "candidates per round")
+  .option("-s, --seed <n>", "base seed for reproducible candidate seeds")
   .description("Generate, critique, and revise until the shot satisfies the contract")
-  .action(async (descriptionParts: string[], opts: { rounds?: string; candidates?: string }) => {
+  .action(async (descriptionParts: string[], opts: { rounds?: string; candidates?: string; seed?: string }) => {
     const projectDir = program.opts<{ dir: string }>().dir;
     const config = loadConfig();
     if (opts.rounds) config.maxRounds = Number.parseInt(opts.rounds, 10);
     if (opts.candidates) config.candidatesPerRound = Number.parseInt(opts.candidates, 10);
+    const baseSeed = opts.seed !== undefined ? Number.parseInt(opts.seed, 10) : undefined;
     const contract = readContract(projectDir);
     const backend = createReplicateBackend({ draftModel: config.draftModel, finalModel: config.finalModel });
 
-    const result = await shoot({ config, backend, contract, projectDir, log }, descriptionParts.join(" "));
+    const result = await shoot({ config, backend, contract, projectDir, log, baseSeed }, descriptionParts.join(" "));
     log(`\nShoot complete: ${result.shotDir}`);
     log(`  Contact sheet: ${path.join(result.shotDir, "contact-sheet.html")}`);
     log(result.finalFile ? `  Final: ${path.join(result.shotDir, result.finalFile)}` : "  No final shipped.");
+    log(`  Spend: ${renderUsage(result.usage)}`);
+    log(`  Reproduce with: shoot --seed ${result.baseSeed}`);
+  });
+
+program
+  .command("amend")
+  .argument("<feedback...>", "what should change, e.g. \"warmer light, less clutter\"")
+  .option("--ref <images...>", "reference image(s) the feedback points at")
+  .description("Amend the Style Contract from feedback — the director folds it into direction.md")
+  .action(async (feedbackParts: string[], opts: { ref?: string[] }) => {
+    const projectDir = program.opts<{ dir: string }>().dir;
+    const config = loadConfig();
+    const contract = readContract(projectDir);
+    const referenceImages = (opts.ref ?? []).map((file) => fs.readFileSync(file));
+
+    const result = await amendDirection(config.directorModel, contract, feedbackParts.join(" "), referenceImages);
+    writeContract(projectDir, serializeContract(result.contract));
+    log(`direction.md v${contract.version} -> v${result.contract.version}: ${result.summary}`);
+    for (const change of result.changes) log(`  · ${change}`);
+    log("Previous version lives in git history — diff it to review the amendment.");
   });
 
 program

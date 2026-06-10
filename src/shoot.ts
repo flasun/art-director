@@ -2,17 +2,21 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ImageBackend } from "./backends/types.js";
 import { runChecks } from "./checks.js";
+import { getClaudeUsage, resetClaudeUsage } from "./claude.js";
 import type { Config } from "./config.js";
 import { renderContactSheet } from "./contactsheet.js";
 import { writeShootRecords } from "./decisions.js";
 import { compilePrompt, critiqueCandidates, revisePrompt } from "./director.js";
 import { createShotDir } from "./project.js";
 import type { Candidate, RoundRecord, StyleContract } from "./types.js";
+import type { UsageTally } from "./usage.js";
 
 export interface ShootResult {
   shotDir: string;
   finalFile: string | null;
   rounds: RoundRecord[];
+  usage: UsageTally;
+  baseSeed: number;
 }
 
 interface ShootDeps {
@@ -21,12 +25,23 @@ interface ShootDeps {
   contract: StyleContract;
   projectDir: string;
   log: (message: string) => void;
+  /** Pin for reproducible candidate seeds; omit for a random shoot. */
+  baseSeed?: number;
+}
+
+/** Deterministic, non-overlapping seeds: same base seed, same shoot. */
+export function seedsForRound(baseSeed: number, round: number, count: number): number[] {
+  return Array.from({ length: count }, (_, i) => (baseSeed + (round - 1) * count + i) % 2_147_483_647);
 }
 
 export async function shoot(deps: ShootDeps, shotDescription: string): Promise<ShootResult> {
   const { config, backend, contract, log } = deps;
+  const baseSeed = deps.baseSeed ?? Math.floor(Math.random() * 1_000_000_000);
   const shotDir = createShotDir(deps.projectDir, shotDescription);
   const rounds: RoundRecord[] = [];
+  let draftRenders = 0;
+  let finalRenders = 0;
+  resetClaudeUsage();
 
   log(`Compiling Style Contract into a ${backend.id} prompt...`);
   let { prompt, rationale } = await compilePrompt(config.directorModel, contract, shotDescription, backend.dialect);
@@ -40,10 +55,11 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
     const roundDir = path.join(shotDir, `round-${round}`);
     fs.mkdirSync(roundDir, { recursive: true });
 
-    const seeds = Array.from({ length: config.candidatesPerRound }, () => Math.floor(Math.random() * 1_000_000));
+    const seeds = seedsForRound(baseSeed, round, config.candidatesPerRound);
     const images = await Promise.all(
       seeds.map((seed) => backend.generate({ prompt, aspect: contract.aspect, seed, quality: "draft" })),
     );
+    draftRenders += images.length;
 
     const candidates = images.map((image, i) => {
       const id = `r${round}-c${i + 1}`;
@@ -93,6 +109,7 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
         seed: winner.candidate.seed,
         quality: "final",
       });
+      finalRenders += 1;
       finalFile = "final.png";
       fs.writeFileSync(path.join(shotDir, finalFile), final.buffer);
     } catch (error) {
@@ -105,7 +122,8 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
     }
   }
 
-  writeShootRecords(shotDir, shotDescription, rounds, finalFile);
+  const usage: UsageTally = { ...getClaudeUsage(), draftRenders, finalRenders };
+  writeShootRecords(shotDir, shotDescription, rounds, finalFile, { usage, baseSeed });
   fs.writeFileSync(path.join(shotDir, "contact-sheet.html"), renderContactSheet(shotDescription, rounds, finalFile));
-  return { shotDir, finalFile, rounds };
+  return { shotDir, finalFile, rounds, usage, baseSeed };
 }

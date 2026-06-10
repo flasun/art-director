@@ -57,9 +57,10 @@ You can also `npm run build` and use the `art-director` bin directly.
 | `init [dir]` | Scaffold a project with a `brief.md` template |
 | `interview` | Forced-choice creative interview → drafts `direction.md` |
 | `shoot <description>` | Generate → critique → revise loop, then a full-quality final render |
+| `amend <feedback>` | Fold feedback into the contract: `amend "warmer light" --ref liked.png` bumps the version, changes only what the feedback demands |
 | `critique <images...>` | Judge existing images against the Style Contract |
 
-Global flag: `-C, --dir <dir>` selects the project directory. `shoot` takes `--rounds` and `--candidates` to override the budget.
+Global flag: `-C, --dir <dir>` selects the project directory. `shoot` takes `--rounds` and `--candidates` to override the budget, and `--seed` to reproduce a previous shoot exactly (every shoot logs its base seed). Each shoot also records its spend — director tokens and render counts — in `critique.md`.
 
 ## How the loop judges work
 

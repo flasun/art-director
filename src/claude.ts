@@ -2,8 +2,19 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 import { requireEnv } from "./config.js";
+import { addClaudeUsage, emptyTally, type UsageTally } from "./usage.js";
 
 let client: Anthropic | null = null;
+let tally: UsageTally = emptyTally();
+
+export function resetClaudeUsage(): void {
+  tally = emptyTally();
+}
+
+/** Token spend accumulated by director calls since the last reset. */
+export function getClaudeUsage(): UsageTally {
+  return { ...tally };
+}
 
 function getClient(): Anthropic {
   if (!client) {
@@ -45,6 +56,7 @@ export async function directorCall<Schema extends z.ZodType>(opts: {
     messages: [{ role: "user", content: opts.content }],
     output_config: { format: zodOutputFormat(opts.schema) },
   });
+  addClaudeUsage(tally, response.usage);
   if (response.parsed_output == null) {
     throw new Error(`Director response for ${opts.schemaName} did not match the expected schema`);
   }

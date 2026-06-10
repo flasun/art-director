@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { DecisionEntry, RoundRecord } from "./types.js";
+import { renderUsage, type UsageTally } from "./usage.js";
+
+export interface ShootMeta {
+  usage: UsageTally;
+  baseSeed: number;
+}
 
 export function logDecision(shotDir: string, entry: DecisionEntry): void {
   fs.appendFileSync(path.join(shotDir, "decisions.jsonl"), `${JSON.stringify(entry)}\n`);
@@ -26,7 +32,12 @@ export function decisionsForRound(round: RoundRecord): DecisionEntry[] {
 }
 
 /** Human-readable record of the shoot — committed next to the assets. */
-export function renderCritiqueMarkdown(shotDescription: string, rounds: RoundRecord[], finalFile: string | null): string {
+export function renderCritiqueMarkdown(
+  shotDescription: string,
+  rounds: RoundRecord[],
+  finalFile: string | null,
+  meta?: ShootMeta,
+): string {
   const lines: string[] = [`# Shoot log — ${shotDescription}`, ""];
   for (const round of rounds) {
     lines.push(`## Round ${round.round}`, "", `**Prompt:** ${round.prompt}`, "");
@@ -52,6 +63,15 @@ export function renderCritiqueMarkdown(shotDescription: string, rounds: RoundRec
     }
   }
   lines.push(finalFile ? `## Final\n\nShipped: ${finalFile}` : "## Final\n\nNothing shipped — budget exhausted.", "");
+  if (meta) {
+    lines.push(
+      "## Spend",
+      "",
+      `- Base seed: ${meta.baseSeed} (re-run with \`shoot --seed ${meta.baseSeed}\` to reproduce)`,
+      `- ${renderUsage(meta.usage)}`,
+      "",
+    );
+  }
   return lines.join("\n");
 }
 
@@ -60,9 +80,10 @@ export function writeShootRecords(
   shotDescription: string,
   rounds: RoundRecord[],
   finalFile: string | null,
+  meta?: ShootMeta,
 ): void {
   for (const round of rounds) {
     for (const entry of decisionsForRound(round)) logDecision(shotDir, entry);
   }
-  fs.writeFileSync(path.join(shotDir, "critique.md"), renderCritiqueMarkdown(shotDescription, rounds, finalFile));
+  fs.writeFileSync(path.join(shotDir, "critique.md"), renderCritiqueMarkdown(shotDescription, rounds, finalFile, meta));
 }
