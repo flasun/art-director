@@ -81,6 +81,8 @@ The Style Contract compiles to per-model prompts through dialect adapters, so di
 |---|---|---|
 | `replicate` (default) | Flux schnell drafts, Flux 1.1-pro finals | Seeds honored; references via image conditioning per Flux family |
 | `gpt-image` | `gpt-image-1` | Instruction-following dialect; fixed render sizes are center-cropped to the contract aspect; **no seed control**; references go through the edits endpoint |
+| `fal` | Flux schnell drafts, Flux-pro 1.1 finals | Same Flux dialect, different host (`FAL_KEY`); references swap in an image-to-image model |
+| `comfyui` | Your local SDXL/Flux graph | Tag-style dialect; point `COMFYUI_WORKFLOW` at an API-format export containing `{{PROMPT}}`/`{{SEED}}`/`{{WIDTH}}`/`{{HEIGHT}}` placeholders — your checkpoints and LoRAs, our loop. No `--ref` yet |
 
 `rerender shots/<dir> -b gpt-image` is the portability proof: the contract is recompiled for the new dialect, rendered once at full quality, and the director compares both finals against the contract — verdict, differences, and measured palette distance in `rerenders/<backend>/report.md`.
 
@@ -107,6 +109,11 @@ Set in `.env` (see `.env.example`):
 | `ART_DIRECTOR_BACKEND` | `replicate` | Image backend: `replicate` or `gpt-image` |
 | `OPENAI_API_KEY` | — | Required only for the `gpt-image` backend |
 | `OPENAI_IMAGE_MODEL` | `gpt-image-1` | Model for the `gpt-image` backend |
+| `FAL_KEY` | — | Required only for the `fal` backend |
+| `FAL_DRAFT_MODEL` / `FAL_FINAL_MODEL` | `fal-ai/flux/schnell` / `fal-ai/flux-pro/v1.1` | fal models |
+| `FAL_REF_MODEL` | `fal-ai/flux/dev/image-to-image` | fal model swapped in when `--ref` is used |
+| `COMFYUI_URL` | `http://127.0.0.1:8188` | Local ComfyUI server |
+| `COMFYUI_WORKFLOW` | — | Path to your placeholder-templated API-format workflow (required for `comfyui`) |
 | `ART_DIRECTOR_TASTE` | on | Set `off` to disable taste memory entirely |
 | `ART_DIRECTOR_TASTE_FILE` | `~/.art-director/taste.md` | Where the taste profile lives |
 | `ART_DIRECTOR_ROUNDS` | `2` | Max critique rounds per shot |

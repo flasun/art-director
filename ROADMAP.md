@@ -30,7 +30,7 @@
 - [x] Set-level consistency audit: pairwise CIELAB palette drift + tonal deviation (measured) feeding a directed set critique with verdict/outliers/advice; standalone `audit <shotDirs...>`
 - [x] Reference images: `shoot --ref` / `campaign --ref` condition generation (per-family Flux input mapping, auto-downscaled data URIs, draft-model swap) and make reference fidelity a hard critique criterion; recorded in `shot.json` so `recritique` reuses them
 - [x] Second backend family behind the dialect adapter: OpenAI gpt-image (`--backend gpt-image`, registry, fixed sizes center-cropped to the contract aspect, references via the edits endpoint)
-- [ ] More backends: SDXL/ComfyUI, fal
+- [x] More backends: fal (queue API, img2img reference swap, PNG enforcement) and local SDXL/Flux via ComfyUI (user-owned workflow template with `{{PROMPT}}`/`{{SEED}}`/`{{WIDTH}}`/`{{HEIGHT}}` placeholders)
 - [x] Cross-model re-rendering: `rerender <shotDir> -b <backend>` recompiles the contract for the new dialect and writes a comparison report (verdict, differences, measured palette distance)
 
 ## v3 — the creative department

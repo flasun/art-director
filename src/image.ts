@@ -31,6 +31,24 @@ export function pngDataUri(buffer: Buffer): string {
 }
 
 /**
+ * Concrete pixel dimensions for an aspect ratio, long edge pinned and
+ * both edges rounded to a hardware-friendly multiple. Used by backends
+ * that take explicit width/height instead of an aspect string.
+ */
+export function aspectDimensions(aspect: string, longEdge = 1024, multiple = 16): { width: number; height: number } {
+  const [w, h] = aspect.split(":").map(Number) as [number, number];
+  const round = (v: number) => Math.max(multiple, Math.round(v / multiple) * multiple);
+  if (w >= h) return { width: round(longEdge), height: round((longEdge * h) / w) };
+  return { width: round((longEdge * w) / h), height: round(longEdge) };
+}
+
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+export function isPng(buffer: Buffer): boolean {
+  return buffer.length >= 8 && buffer.subarray(0, 8).equals(PNG_MAGIC);
+}
+
+/**
  * Center-crops to the contract aspect. Used for backends that render at
  * fixed sizes (gpt-image) so deliverables still honor the contract.
  */

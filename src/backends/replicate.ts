@@ -5,6 +5,13 @@ import type { GeneratedImage, GenerateRequest, ImageBackend } from "./types.js";
 const API_BASE = "https://api.replicate.com/v1";
 const REFERENCE_MAX_EDGE = 768;
 
+/** Shared by every backend that serves Flux-family models. */
+export const FLUX_DIALECT =
+  "Flux-family models. Write one flowing natural-language paragraph (not tag soup): " +
+  "subject first, then setting, lighting, lens/camera language, color palette named as plain " +
+  "color words AND hex codes, and mood. Be concrete and visual; avoid negations (the model " +
+  "ignores 'no X' — describe what should be there instead). Keep it under 130 words.";
+
 export interface ReferenceBinding {
   field: string;
   extra?: Record<string, unknown>;
@@ -94,11 +101,7 @@ export function createReplicateBackend(opts: {
 }): ImageBackend {
   return {
     id: "replicate",
-    dialect:
-      "Flux-family models on Replicate. Write one flowing natural-language paragraph (not tag soup): " +
-      "subject first, then setting, lighting, lens/camera language, color palette named as plain " +
-      "color words AND hex codes, and mood. Be concrete and visual; avoid negations (the model " +
-      "ignores 'no X' — describe what should be there instead). Keep it under 130 words.",
+    dialect: FLUX_DIALECT,
 
     async generate(req: GenerateRequest): Promise<GeneratedImage> {
       const token = requireEnv(

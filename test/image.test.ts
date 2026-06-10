@@ -1,6 +1,6 @@
 import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
-import { cropToAspect, downscalePng, pngDataUri } from "../src/image.js";
+import { aspectDimensions, cropToAspect, downscalePng, isPng, pngDataUri } from "../src/image.js";
 
 function solidPngBuffer(rgb: [number, number, number], width: number, height: number): Buffer {
   const png = new PNG({ width, height });
@@ -65,6 +65,28 @@ describe("cropToAspect", () => {
   it("returns the original buffer when the aspect already matches", () => {
     const original = splitPngBuffer([1, 2, 3], [4, 5, 6], 160, 200);
     expect(cropToAspect(original, "4:5")).toBe(original);
+  });
+});
+
+describe("aspectDimensions", () => {
+  it("pins the long edge and rounds to the multiple", () => {
+    expect(aspectDimensions("1:1")).toEqual({ width: 1024, height: 1024 });
+    expect(aspectDimensions("4:5")).toEqual({ width: 816, height: 1024 });
+    expect(aspectDimensions("16:9")).toEqual({ width: 1024, height: 576 });
+    expect(aspectDimensions("4:5", 1024, 8)).toEqual({ width: 816, height: 1024 });
+  });
+
+  it("never collapses below the rounding multiple", () => {
+    expect(aspectDimensions("100:1", 1024, 16).height).toBe(16);
+  });
+});
+
+describe("isPng", () => {
+  it("recognizes png magic bytes and rejects others", () => {
+    const png = PNG.sync.write(new PNG({ width: 2, height: 2 }));
+    expect(isPng(png)).toBe(true);
+    expect(isPng(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]))).toBe(false);
+    expect(isPng(Buffer.from([1, 2]))).toBe(false);
   });
 });
 

@@ -82,7 +82,7 @@ program
   .option("-c, --candidates <n>", "candidates per round")
   .option("-s, --seed <n>", "base seed for reproducible candidate seeds")
   .option("--ref <image>", "reference image that anchors the subject (image conditioning)")
-  .option("-b, --backend <name>", "image backend: replicate | gpt-image")
+  .option("-b, --backend <name>", "image backend: replicate | gpt-image | fal | comfyui")
   .description("Generate, critique, and revise until the shot satisfies the contract")
   .action(
     async (
@@ -174,7 +174,7 @@ program
   .command("campaign")
   .argument("<shotsFile>", "file with one shot description per line (# comments allowed)")
   .option("--ref <image>", "reference image applied to every shot in the campaign")
-  .option("-b, --backend <name>", "image backend: replicate | gpt-image")
+  .option("-b, --backend <name>", "image backend: replicate | gpt-image | fal | comfyui")
   .description("Shoot every line under one contract, then audit the set for consistency")
   .action(async (shotsFile: string, opts: { ref?: string; backend?: string }) => {
     const projectDir = program.opts<{ dir: string }>().dir;
@@ -210,7 +210,7 @@ program
 program
   .command("rerender")
   .argument("<shotDir>", "an existing shot directory with a shipped final")
-  .option("-b, --backend <name>", "image backend to re-render on: replicate | gpt-image")
+  .option("-b, --backend <name>", "image backend to re-render on: replicate | gpt-image | fal | comfyui")
   .description("Re-render a shipped final on another backend under the same contract, and compare")
   .action(async (shotDir: string, opts: { backend?: string }) => {
     const projectDir = program.opts<{ dir: string }>().dir;
