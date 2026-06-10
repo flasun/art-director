@@ -61,9 +61,19 @@ export interface AspectCheck {
   expected: string;
 }
 
+export interface ToneCheck {
+  /** 0-255 mean relative luminance of sampled pixels. */
+  meanLuma: number;
+  p5: number;
+  p95: number;
+  key: "low" | "mid" | "high";
+  contrast: "flat" | "moderate" | "punchy";
+}
+
 export interface DeterministicChecks {
   palette: PaletteCheck;
   aspect: AspectCheck;
+  tone: ToneCheck;
 }
 
 export interface Candidate {
@@ -87,4 +97,17 @@ export interface RoundRecord {
   prompt: string;
   candidates: Candidate[];
   critique: CritiqueResult;
+}
+
+/** Written as shot.json — makes a shoot reproducible and re-judgeable. */
+export interface ShotManifest {
+  shotDescription: string;
+  baseSeed: number;
+  contractVersion: number;
+  rounds: {
+    round: number;
+    prompt: string;
+    candidates: { id: string; file: string; seed: number }[];
+  }[];
+  finalFile: string | null;
 }

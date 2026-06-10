@@ -9,6 +9,7 @@ import { serializeContract } from "./contract.js";
 import { amendDirection, critiqueCandidates } from "./director.js";
 import { runInterview } from "./interview.js";
 import { initProject, readContract, writeContract } from "./project.js";
+import { recritique } from "./recritique.js";
 import { shoot } from "./shoot.js";
 import type { Candidate } from "./types.js";
 import { renderUsage } from "./usage.js";
@@ -34,11 +35,15 @@ program
 
 program
   .command("interview")
+  .option("--probes", "render each forced choice as a pair of probe images (uses the image backend)")
   .description("Run the creative interview and draft direction.md (the Style Contract)")
-  .action(async () => {
+  .action(async (opts: { probes?: boolean }) => {
     const projectDir = program.opts<{ dir: string }>().dir;
     const config = loadConfig();
-    const directionPath = await runInterview({ model: config.directorModel, projectDir, log });
+    const backend = opts.probes
+      ? createReplicateBackend({ draftModel: config.draftModel, finalModel: config.finalModel })
+      : undefined;
+    const directionPath = await runInterview({ model: config.directorModel, projectDir, log, backend });
     log(`\nWrote ${directionPath}. Edit it freely — it is the source of truth.`);
     log(`Next: art-director shoot "<what to produce>"`);
   });
@@ -83,6 +88,18 @@ program
     log(`direction.md v${contract.version} -> v${result.contract.version}: ${result.summary}`);
     for (const change of result.changes) log(`  · ${change}`);
     log("Previous version lives in git history — diff it to review the amendment.");
+  });
+
+program
+  .command("recritique")
+  .argument("<shotDir>", "an existing shot directory (shots/...)")
+  .description("Re-judge a shoot against the current contract — no re-rendering. Pairs with amend.")
+  .action(async (shotDir: string) => {
+    const projectDir = program.opts<{ dir: string }>().dir;
+    const config = loadConfig();
+    const contract = readContract(projectDir);
+    await recritique({ directorModel: config.directorModel, contract, log }, shotDir);
+    log(`\nUpdated critique.md and contact-sheet.html in ${shotDir} (old judgement lives in git history).`);
   });
 
 program

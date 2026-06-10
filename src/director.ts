@@ -262,6 +262,7 @@ ${shotDescription}`,
       textBlock(
         `Candidate "${candidate.id}" — measured palette adherence ${candidate.checks.palette.adherence}/100, ` +
           `dominant colors ${candidate.checks.palette.dominant.map((d) => `${d.hex} (ΔE ${d.deltaE} from ${d.nearestContractHex})`).join(", ")}, ` +
+          `tone ${candidate.checks.tone.key} key / ${candidate.checks.tone.contrast} contrast, ` +
           `aspect ${candidate.checks.aspect.ok ? "OK" : `WRONG (${candidate.checks.aspect.actual}, expected ${candidate.checks.aspect.expected})`}:`,
       ),
       imageBlock(png),

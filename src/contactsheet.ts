@@ -8,6 +8,53 @@ function escapeHtml(text: string): string {
     .replaceAll('"', "&quot;");
 }
 
+export interface ProbePair {
+  dimension: string;
+  question: string;
+  fileA: string;
+  fileB: string;
+}
+
+/** Side-by-side A/B pairs for the visual creative interview. */
+export function renderProbeSheet(pairs: ProbePair[]): string {
+  const sections = pairs
+    .map(
+      (pair, i) => `<section>
+  <h2>Pair ${i + 1} — ${escapeHtml(pair.dimension)}</h2>
+  <p class="prompt">${escapeHtml(pair.question)}</p>
+  <div class="pair">
+    <figure class="card"><img src="${escapeHtml(pair.fileA)}" alt="A" loading="lazy" /><figcaption><strong>A</strong></figcaption></figure>
+    <figure class="card"><img src="${escapeHtml(pair.fileB)}" alt="B" loading="lazy" /><figcaption><strong>B</strong></figcaption></figure>
+  </div>
+</section>`,
+    )
+    .join("\n");
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Creative interview probes</title>
+<style>
+  body { font-family: Georgia, serif; background: #181818; color: #EDEAE2; margin: 2rem auto; max-width: 900px; padding: 0 1rem; }
+  h1 { font-weight: normal; font-style: italic; }
+  h2 { border-bottom: 1px solid #3A3A3A; padding-bottom: .3rem; font-weight: normal; }
+  .prompt { color: #B9B4A7; font-size: .95rem; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .card { margin: 0; background: #222; border-radius: 6px; overflow: hidden; }
+  .card img { width: 100%; display: block; }
+  figcaption { padding: .5rem .8rem; font-size: 1rem; }
+</style>
+</head>
+<body>
+<h1>Creative interview probes</h1>
+<p class="prompt">Answer each question in the terminal with A or B — trust your gut.</p>
+${sections}
+</body>
+</html>
+`;
+}
+
 const VERDICT_COLORS: Record<string, string> = {
   ship: "#1B7F4B",
   revise: "#B07D1A",
@@ -41,7 +88,7 @@ export function renderContactSheet(
   <figcaption>
     <span class="verdict" style="background:${color}">${escapeHtml(verdict)}</span>
     <strong>${escapeHtml(candidate.id)}</strong>
-    <span class="meta">palette ${candidate.checks.palette.adherence}/100 · seed ${candidate.seed}</span>
+    <span class="meta">palette ${candidate.checks.palette.adherence}/100 · ${candidate.checks.tone.key} key · seed ${candidate.seed}</span>
     <ul>${reasons}${violations}</ul>
   </figcaption>
 </figure>`;

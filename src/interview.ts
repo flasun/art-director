@@ -1,12 +1,49 @@
+import fs from "node:fs";
+import path from "node:path";
 import readline from "node:readline/promises";
+import type { ImageBackend } from "./backends/types.js";
+import { renderProbeSheet, type ProbePair } from "./contactsheet.js";
 import { serializeContract } from "./contract.js";
-import { draftDirection, generateInterview } from "./director.js";
+import { draftDirection, generateInterview, type InterviewQuestions } from "./director.js";
 import { readBrief, writeContract } from "./project.js";
 
 interface InterviewDeps {
   model: string;
   projectDir: string;
   log: (message: string) => void;
+  /** When set, each forced choice is rendered as a pair of probe images. */
+  backend?: ImageBackend;
+}
+
+async function renderProbes(
+  deps: InterviewDeps,
+  backend: ImageBackend,
+  questions: InterviewQuestions["questions"],
+): Promise<string> {
+  deps.log(`Rendering ${questions.length * 2} probe images (drafts — this costs a few cents)...`);
+  fs.mkdirSync(path.join(deps.projectDir, "probes"), { recursive: true });
+
+  const pairs: ProbePair[] = await Promise.all(
+    questions.map(async (q, i) => {
+      const render = async (option: string, suffix: "a" | "b") => {
+        const image = await backend.generate({
+          prompt: `${option}. Single cohesive image, no text or lettering.`,
+          aspect: "1:1",
+          seed: 1000 + i * 2 + (suffix === "b" ? 1 : 0),
+          quality: "draft",
+        });
+        const file = path.join("probes", `q${i + 1}-${suffix}.png`);
+        fs.writeFileSync(path.join(deps.projectDir, file), image.buffer);
+        return file;
+      };
+      const [fileA, fileB] = await Promise.all([render(q.optionA, "a"), render(q.optionB, "b")]);
+      return { dimension: q.dimension, question: q.question, fileA, fileB };
+    }),
+  );
+
+  const sheetPath = path.join(deps.projectDir, "probes.html");
+  fs.writeFileSync(sheetPath, renderProbeSheet(pairs));
+  return sheetPath;
 }
 
 export async function runInterview(deps: InterviewDeps): Promise<string> {
@@ -15,12 +52,18 @@ export async function runInterview(deps: InterviewDeps): Promise<string> {
   deps.log("Reading the brief and preparing the creative interview...");
   const { questions } = await generateInterview(deps.model, brief);
 
+  let probeSheet: string | null = null;
+  if (deps.backend) {
+    probeSheet = await renderProbes(deps, deps.backend, questions);
+    deps.log(`Open ${probeSheet} to see each pair while you answer.\n`);
+  }
+
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const transcript: string[] = [];
   try {
     deps.log("\nAnswer with A or B (gut response — don't overthink). Add a note after a comma if you like.\n");
     for (const [i, q] of questions.entries()) {
-      deps.log(`${i + 1}. [${q.dimension}] ${q.question}`);
+      deps.log(`${i + 1}. [${q.dimension}] ${q.question}${probeSheet ? `  (pair ${i + 1} in probes.html)` : ""}`);
       deps.log(`   A) ${q.optionA}`);
       deps.log(`   B) ${q.optionB}`);
       let choice = "";

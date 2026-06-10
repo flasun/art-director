@@ -55,16 +55,17 @@ You can also `npm run build` and use the `art-director` bin directly.
 | Command | What it does |
 |---|---|
 | `init [dir]` | Scaffold a project with a `brief.md` template |
-| `interview` | Forced-choice creative interview → drafts `direction.md` |
+| `interview` | Forced-choice creative interview → drafts `direction.md`. Add `--probes` to render each choice as a pair of images (`probes.html`) |
 | `shoot <description>` | Generate → critique → revise loop, then a full-quality final render |
 | `amend <feedback>` | Fold feedback into the contract: `amend "warmer light" --ref liked.png` bumps the version, changes only what the feedback demands |
+| `recritique <shotDir>` | Re-judge an existing shoot against the current contract — no re-rendering. The natural follow-up to `amend` |
 | `critique <images...>` | Judge existing images against the Style Contract |
 
 Global flag: `-C, --dir <dir>` selects the project directory. `shoot` takes `--rounds` and `--candidates` to override the budget, and `--seed` to reproduce a previous shoot exactly (every shoot logs its base seed). Each shoot also records its spend — director tokens and render counts — in `critique.md`.
 
 ## How the loop judges work
 
-Critique is half computed, half directed. Deterministic checks run first — dominant-color extraction with CIELAB distance against the contract palette, plus aspect-ratio verification — and the measured numbers are handed to Claude alongside the images. Claude then critiques each candidate against the contract rubric (mood, composition, lighting, NEVER rules, technical flaws), ranks candidates by pairwise comparison, and either ships one or rewrites the prompt for the next round. Hard budgets (`ART_DIRECTOR_ROUNDS` × `ART_DIRECTOR_CANDIDATES`, default 2 × 4 drafts + 1 final) keep costs bounded.
+Critique is half computed, half directed. Deterministic checks run first — dominant-color extraction with CIELAB distance against the contract palette, tonal key/contrast stats, plus aspect-ratio verification — and the measured numbers are handed to Claude alongside the images. Claude then critiques each candidate against the contract rubric (mood, composition, lighting, NEVER rules, technical flaws), ranks candidates by pairwise comparison, and either ships one or rewrites the prompt for the next round. Hard budgets (`ART_DIRECTOR_ROUNDS` × `ART_DIRECTOR_CANDIDATES`, default 2 × 4 drafts + 1 final) keep costs bounded.
 
 ## Configuration
 

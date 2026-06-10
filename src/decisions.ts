@@ -1,15 +1,32 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { DecisionEntry, RoundRecord } from "./types.js";
+import type { DecisionEntry, RoundRecord, ShotManifest } from "./types.js";
 import { renderUsage, type UsageTally } from "./usage.js";
 
 export interface ShootMeta {
   usage: UsageTally;
   baseSeed: number;
+  contractVersion: number;
 }
 
 export function logDecision(shotDir: string, entry: DecisionEntry): void {
   fs.appendFileSync(path.join(shotDir, "decisions.jsonl"), `${JSON.stringify(entry)}\n`);
+}
+
+export function writeShotManifest(shotDir: string, manifest: ShotManifest): void {
+  fs.writeFileSync(path.join(shotDir, "shot.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+export function readShotManifest(shotDir: string): ShotManifest {
+  const manifestPath = path.join(shotDir, "shot.json");
+  if (!fs.existsSync(manifestPath)) {
+    throw new Error(`No shot.json in ${shotDir} — only shoots made with this version can be re-judged.`);
+  }
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as ShotManifest;
+  if (!Array.isArray(manifest.rounds) || typeof manifest.shotDescription !== "string") {
+    throw new Error(`${manifestPath} is not a valid shot manifest`);
+  }
+  return manifest;
 }
 
 export function decisionsForRound(round: RoundRecord): DecisionEntry[] {
@@ -39,12 +56,16 @@ export function renderCritiqueMarkdown(
   meta?: ShootMeta,
 ): string {
   const lines: string[] = [`# Shoot log — ${shotDescription}`, ""];
+  if (meta) {
+    lines.push(`Judged against direction.md v${meta.contractVersion}.`, "");
+  }
   for (const round of rounds) {
     lines.push(`## Round ${round.round}`, "", `**Prompt:** ${round.prompt}`, "");
     for (const candidate of round.candidates) {
       const critique = round.critique.critiques.find((c) => c.candidate === candidate.id);
       lines.push(`### ${candidate.id} — ${critique?.verdict ?? "unrated"}`);
       lines.push(`- Palette adherence (measured): ${candidate.checks.palette.adherence}/100`);
+      lines.push(`- Tone (measured): ${candidate.checks.tone.key} key, ${candidate.checks.tone.contrast} contrast`);
       if (!candidate.checks.aspect.ok) {
         lines.push(`- Aspect: WRONG — ${candidate.checks.aspect.actual}, expected ${candidate.checks.aspect.expected}`);
       }

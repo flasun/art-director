@@ -17,11 +17,12 @@
 ## v1 — a director you can argue with
 
 - [x] `amend "<feedback>" --ref <image>`: fold feedback into the contract as a versioned amendment, changing only what the feedback demands
-- [ ] Render probe image pairs during the interview (visual forced choice, not textual)
+- [x] Render probe image pairs during the interview (`interview --probes` → `probes.html`)
 - [x] Per-round seed pinning and `--seed` reuse to reproduce a shoot
-- [ ] OCR/text-artifact deterministic check; contrast check
+- [x] Tonal key + contrast measured stats fed into critique
+- [ ] OCR/text-artifact deterministic check (needs a lightweight OCR option)
 - [x] Cost accounting per shoot (director tokens + render counts in `critique.md` and the console)
-- [ ] Resumable shoots; re-critique without re-rendering (workaround: `critique shots/<dir>/round-*/*.png`)
+- [x] Shot manifest (`shot.json`) + `recritique <shotDir>`: re-judge a shoot against the amended contract without re-rendering
 
 ## v2 — sets, not shots
 

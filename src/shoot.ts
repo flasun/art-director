@@ -5,7 +5,7 @@ import { runChecks } from "./checks.js";
 import { getClaudeUsage, resetClaudeUsage } from "./claude.js";
 import type { Config } from "./config.js";
 import { renderContactSheet } from "./contactsheet.js";
-import { writeShootRecords } from "./decisions.js";
+import { writeShootRecords, writeShotManifest } from "./decisions.js";
 import { compilePrompt, critiqueCandidates, revisePrompt } from "./director.js";
 import { createShotDir } from "./project.js";
 import type { Candidate, RoundRecord, StyleContract } from "./types.js";
@@ -123,7 +123,22 @@ export async function shoot(deps: ShootDeps, shotDescription: string): Promise<S
   }
 
   const usage: UsageTally = { ...getClaudeUsage(), draftRenders, finalRenders };
-  writeShootRecords(shotDir, shotDescription, rounds, finalFile, { usage, baseSeed });
+  writeShootRecords(shotDir, shotDescription, rounds, finalFile, {
+    usage,
+    baseSeed,
+    contractVersion: contract.version,
+  });
   fs.writeFileSync(path.join(shotDir, "contact-sheet.html"), renderContactSheet(shotDescription, rounds, finalFile));
+  writeShotManifest(shotDir, {
+    shotDescription,
+    baseSeed,
+    contractVersion: contract.version,
+    rounds: rounds.map((r) => ({
+      round: r.round,
+      prompt: r.prompt,
+      candidates: r.candidates.map(({ id, file, seed }) => ({ id, file, seed })),
+    })),
+    finalFile,
+  });
   return { shotDir, finalFile, rounds, usage, baseSeed };
 }

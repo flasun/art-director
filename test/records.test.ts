@@ -14,6 +14,7 @@ const ROUND: RoundRecord = {
       checks: {
         palette: { adherence: 91, dominant: [{ hex: "#E8DCC8", weight: 0.8, nearestContractHex: "#E8DCC8", deltaE: 0.4 }] },
         aspect: { ok: true, actual: "1024x1280", expected: "4:5" },
+        tone: { meanLuma: 190, p5: 120, p95: 240, key: "high", contrast: "moderate" },
       },
     },
     {
@@ -23,6 +24,7 @@ const ROUND: RoundRecord = {
       checks: {
         palette: { adherence: 38, dominant: [{ hex: "#3355FF", weight: 0.7, nearestContractHex: "#E8DCC8", deltaE: 38 }] },
         aspect: { ok: true, actual: "1024x1280", expected: "4:5" },
+        tone: { meanLuma: 60, p5: 10, p95: 220, key: "low", contrast: "punchy" },
       },
     },
   ],
@@ -97,14 +99,17 @@ describe("renderCritiqueMarkdown", () => {
     expect(md).not.toContain("## Spend");
   });
 
-  it("records spend and the reproducible base seed when meta is given", () => {
+  it("records spend, contract version, and the reproducible base seed when meta is given", () => {
     const md = renderCritiqueMarkdown("Hero shot", [ROUND], "final.png", {
       usage: { claudeCalls: 4, inputTokens: 12345, outputTokens: 2100, draftRenders: 8, finalRenders: 1 },
       baseSeed: 123456,
+      contractVersion: 2,
     });
     expect(md).toContain("## Spend");
     expect(md).toContain("shoot --seed 123456");
     expect(md).toContain("4 director calls");
     expect(md).toContain("8 draft + 1 final renders");
+    expect(md).toContain("Judged against direction.md v2.");
+    expect(md).toContain("Tone (measured): high key, moderate contrast");
   });
 });

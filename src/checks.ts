@@ -1,6 +1,6 @@
 import { PNG } from "pngjs";
 import { normalizeHex } from "./contract.js";
-import type { AspectCheck, DeterministicChecks, PaletteCheck, PaletteColor } from "./types.js";
+import type { AspectCheck, DeterministicChecks, PaletteCheck, PaletteColor, ToneCheck } from "./types.js";
 
 type Rgb = [number, number, number];
 
@@ -137,6 +137,31 @@ export function paletteAdherence(png: PNG, contractPalette: PaletteColor[]): Pal
   return { adherence, dominant };
 }
 
+/**
+ * Tonal key and contrast from the luminance distribution. No contract
+ * target — these are measured facts handed to the critique as context.
+ */
+export function toneStats(png: PNG): ToneCheck {
+  const lumas = samplePixels(png)
+    .map(([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b)
+    .sort((a, b) => a - b);
+  if (lumas.length === 0) {
+    return { meanLuma: 0, p5: 0, p95: 0, key: "mid", contrast: "flat" };
+  }
+  const pick = (q: number) => lumas[Math.min(lumas.length - 1, Math.floor(q * lumas.length))]!;
+  const mean = lumas.reduce((s, l) => s + l, 0) / lumas.length;
+  const p5 = pick(0.05);
+  const p95 = pick(0.95);
+  const spread = p95 - p5;
+  return {
+    meanLuma: Math.round(mean),
+    p5: Math.round(p5),
+    p95: Math.round(p95),
+    key: mean < 85 ? "low" : mean > 170 ? "high" : "mid",
+    contrast: spread < 80 ? "flat" : spread > 170 ? "punchy" : "moderate",
+  };
+}
+
 export function checkAspect(width: number, height: number, expected: string, tolerance = 0.03): AspectCheck {
   const [w, h] = expected.split(":").map(Number) as [number, number];
   const ok = Math.abs(width / height - w / h) / (w / h) <= tolerance;
@@ -148,5 +173,6 @@ export function runChecks(pngBuffer: Buffer, contract: { palette: PaletteColor[]
   return {
     palette: paletteAdherence(png, contract.palette),
     aspect: checkAspect(png.width, png.height, contract.aspect),
+    tone: toneStats(png),
   };
 }

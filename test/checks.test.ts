@@ -8,6 +8,7 @@ import {
   paletteAdherence,
   rgbToHex,
   runChecks,
+  toneStats,
 } from "../src/checks.js";
 
 function solidPng(width: number, height: number, rgb: [number, number, number]): PNG {
@@ -101,6 +102,25 @@ describe("checkAspect", () => {
   });
 });
 
+describe("toneStats", () => {
+  it("reads a dark solid image as low key and flat", () => {
+    const tone = toneStats(solidPng(64, 64, [30, 30, 30]));
+    expect(tone.key).toBe("low");
+    expect(tone.contrast).toBe("flat");
+    expect(tone.meanLuma).toBe(30);
+  });
+
+  it("reads a bright solid image as high key", () => {
+    expect(toneStats(solidPng(64, 64, [230, 230, 230])).key).toBe("high");
+  });
+
+  it("reads a black/white split as punchy contrast", () => {
+    const tone = toneStats(halfHalfPng(64, 64, [0, 0, 0], [255, 255, 255]));
+    expect(tone.contrast).toBe("punchy");
+    expect(tone.key).toBe("mid");
+  });
+});
+
 describe("runChecks", () => {
   it("runs against an encoded PNG buffer", () => {
     const buffer = PNG.sync.write(solidPng(40, 50, [232, 220, 200]));
@@ -110,5 +130,6 @@ describe("runChecks", () => {
     });
     expect(checks.palette.adherence).toBeGreaterThanOrEqual(95);
     expect(checks.aspect.ok).toBe(true);
+    expect(checks.tone.key).toBe("high");
   });
 });
