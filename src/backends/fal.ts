@@ -1,5 +1,6 @@
 import { requireEnv } from "../config.js";
 import { aspectDimensions, downscalePng, isPng, pngDataUri } from "../image.js";
+import { fetchWithRetry } from "../net.js";
 import { FLUX_DIALECT } from "./replicate.js";
 import type { GeneratedImage, GenerateRequest, ImageBackend } from "./types.js";
 
@@ -54,7 +55,7 @@ interface FalOutput {
 }
 
 async function falFetch<T>(url: string, key: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     ...init,
     headers: { Authorization: `Key ${key}`, "Content-Type": "application/json", ...init?.headers },
   });
@@ -104,7 +105,7 @@ export function createFalBackend(opts: { draftModel: string; finalModel: string;
       const output = await falFetch<FalOutput>(submitted.response_url, key);
       const url = output.images?.[0]?.url;
       if (!url) throw new Error(`fal request ${submitted.request_id ?? ""} completed but returned no image`);
-      const imageRes = await fetch(url);
+      const imageRes = await fetchWithRetry(url);
       if (!imageRes.ok) throw new Error(`Failed to download fal image (${imageRes.status})`);
       const buffer = Buffer.from(await imageRes.arrayBuffer());
       if (!isPng(buffer)) {

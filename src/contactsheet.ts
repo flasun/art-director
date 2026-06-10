@@ -9,6 +9,8 @@ export function escapeHtml(text: string): string {
 }
 
 export interface ProbePair {
+  /** 1-based question number — pairs can be sparse when renders fail. */
+  pairNumber: number;
   dimension: string;
   question: string;
   fileA: string;
@@ -19,8 +21,8 @@ export interface ProbePair {
 export function renderProbeSheet(pairs: ProbePair[]): string {
   const sections = pairs
     .map(
-      (pair, i) => `<section>
-  <h2>Pair ${i + 1} — ${escapeHtml(pair.dimension)}</h2>
+      (pair) => `<section>
+  <h2>Pair ${pair.pairNumber} — ${escapeHtml(pair.dimension)}</h2>
   <p class="prompt">${escapeHtml(pair.question)}</p>
   <div class="pair">
     <figure class="card"><img src="${escapeHtml(pair.fileA)}" alt="A" loading="lazy" /><figcaption><strong>A</strong></figcaption></figure>

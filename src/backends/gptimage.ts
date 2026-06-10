@@ -1,5 +1,6 @@
 import { requireEnv } from "../config.js";
 import { cropToAspect } from "../image.js";
+import { fetchWithRetry } from "../net.js";
 import type { GeneratedImage, GenerateRequest, ImageBackend } from "./types.js";
 
 const API_BASE = "https://api.openai.com/v1";
@@ -63,13 +64,13 @@ export function createGptImageBackend(opts: { model: string }): ImageBackend {
         form.append("size", size);
         form.append("quality", quality);
         form.append("image", new Blob([new Uint8Array(req.referenceImage)], { type: "image/png" }), "reference.png");
-        res = await fetch(`${API_BASE}/images/edits`, {
+        res = await fetchWithRetry(`${API_BASE}/images/edits`, {
           method: "POST",
           headers: { Authorization: `Bearer ${key}` },
           body: form,
         });
       } else {
-        res = await fetch(`${API_BASE}/images/generations`, {
+        res = await fetchWithRetry(`${API_BASE}/images/generations`, {
           method: "POST",
           headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
           body: JSON.stringify({

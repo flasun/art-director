@@ -55,6 +55,7 @@ describe("renderProbeSheet", () => {
   it("renders pairs with escaped questions", () => {
     const html = renderProbeSheet([
       {
+        pairNumber: 1,
         dimension: "color temperature",
         question: 'Warm & "golden" or cool <steel>?',
         fileA: "probes/q1-a.png",

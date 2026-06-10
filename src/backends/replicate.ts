@@ -1,5 +1,6 @@
 import { requireEnv } from "../config.js";
 import { downscalePng, pngDataUri } from "../image.js";
+import { fetchWithRetry } from "../net.js";
 import type { GeneratedImage, GenerateRequest, ImageBackend } from "./types.js";
 
 const API_BASE = "https://api.replicate.com/v1";
@@ -59,7 +60,7 @@ interface Prediction {
 }
 
 async function replicateFetch(url: string, token: string, init?: RequestInit): Promise<Prediction> {
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -127,7 +128,7 @@ export function createReplicateBackend(opts: {
       if (!url) {
         throw new Error(`Replicate prediction ${done.id} succeeded but returned no output URL`);
       }
-      const imageRes = await fetch(url);
+      const imageRes = await fetchWithRetry(url);
       if (!imageRes.ok) {
         throw new Error(`Failed to download generated image (${imageRes.status}) from ${url}`);
       }

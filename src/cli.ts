@@ -23,6 +23,7 @@ import {
 } from "./taste.js";
 import type { Candidate } from "./types.js";
 import { renderUsage } from "./usage.js";
+import { parseIntInRange, readPngFile } from "./validate.js";
 
 const log = (message: string) => console.log(message);
 
@@ -35,7 +36,7 @@ process.stdout.on("error", (error: NodeJS.ErrnoException) => {
 function loadReference(projectDir: string, refPath: string | undefined): ShootReference | undefined {
   if (!refPath) return undefined;
   const resolved = path.resolve(refPath);
-  return { file: path.relative(path.resolve(projectDir), resolved), png: fs.readFileSync(resolved) };
+  return { file: path.relative(path.resolve(projectDir), resolved), png: readPngFile(resolved, "--ref image") };
 }
 
 const program = new Command();
@@ -91,10 +92,11 @@ program
     ) => {
     const projectDir = program.opts<{ dir: string }>().dir;
     const config = loadConfig();
-    if (opts.rounds) config.maxRounds = Number.parseInt(opts.rounds, 10);
-    if (opts.candidates) config.candidatesPerRound = Number.parseInt(opts.candidates, 10);
+    if (opts.rounds) config.maxRounds = parseIntInRange("--rounds", opts.rounds, 1, 6);
+    if (opts.candidates) config.candidatesPerRound = parseIntInRange("--candidates", opts.candidates, 1, 8);
     if (opts.backend) config.backend = opts.backend;
-    const baseSeed = opts.seed !== undefined ? Number.parseInt(opts.seed, 10) : undefined;
+    const baseSeed =
+      opts.seed !== undefined ? parseIntInRange("--seed", opts.seed, 0, 2_147_483_646) : undefined;
     const contract = readContract(projectDir);
     const backend = createBackend(config);
     const reference = loadReference(projectDir, opts.ref);
@@ -120,7 +122,7 @@ program
     const projectDir = program.opts<{ dir: string }>().dir;
     const config = loadConfig();
     const contract = readContract(projectDir);
-    const referenceImages = (opts.ref ?? []).map((file) => fs.readFileSync(file));
+    const referenceImages = (opts.ref ?? []).map((file) => readPngFile(file, "--ref image"));
     const feedback = feedbackParts.join(" ");
     const taste = opts.taste && tasteEnabled() ? readTasteProfile() : null;
 
@@ -246,7 +248,7 @@ program
     const contract = readContract(projectDir);
 
     const candidates = images.map((file, i) => {
-      const png = fs.readFileSync(file);
+      const png = readPngFile(file, "critique input");
       const candidate: Candidate = {
         id: path.basename(file, path.extname(file)) || `image-${i + 1}`,
         file,
