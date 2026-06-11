@@ -39,7 +39,8 @@ export function imageBlock(png: Buffer): ContentBlock {
 
 /**
  * One structured director call: system prompt + content blocks in,
- * schema-validated object out.
+ * schema-validated object out. A response that misses the schema is
+ * retried once before failing — these calls sit between paid renders.
  */
 export async function directorCall<Schema extends z.ZodType>(opts: {
   model: string;
@@ -48,17 +49,28 @@ export async function directorCall<Schema extends z.ZodType>(opts: {
   schema: Schema;
   schemaName: string;
 }): Promise<z.infer<Schema>> {
-  const response = await getClient().messages.parse({
-    model: opts.model,
-    max_tokens: 16000,
-    thinking: { type: "adaptive" },
-    system: opts.system,
-    messages: [{ role: "user", content: opts.content }],
-    output_config: { format: zodOutputFormat(opts.schema) },
-  });
-  addClaudeUsage(tally, response.usage);
+  const attempt = async () => {
+    const response = await getClient().messages.parse({
+      model: opts.model,
+      max_tokens: 16000,
+      thinking: { type: "adaptive" },
+      system: opts.system,
+      messages: [{ role: "user", content: opts.content }],
+      output_config: { format: zodOutputFormat(opts.schema) },
+    });
+    addClaudeUsage(tally, response.usage);
+    return response;
+  };
+
+  let response = await attempt();
   if (response.parsed_output == null) {
-    throw new Error(`Director response for ${opts.schemaName} did not match the expected schema`);
+    response = await attempt();
+  }
+  if (response.parsed_output == null) {
+    throw new Error(
+      `Director response for ${opts.schemaName} did not match the expected schema after a retry ` +
+        `(stop_reason: ${response.stop_reason ?? "unknown"})`,
+    );
   }
   return response.parsed_output;
 }

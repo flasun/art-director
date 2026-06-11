@@ -119,7 +119,11 @@ Set in `.env` (see `.env.example`):
 | `ART_DIRECTOR_ROUNDS` | `2` | Max critique rounds per shot |
 | `ART_DIRECTOR_CANDIDATES` | `4` | Candidates per round |
 
-A default shoot makes up to ~9 image generations and ~4 Claude calls — real API costs, kept small and capped.
+A default shoot makes up to ~9 image generations and ~4 Claude calls — real API costs, kept small and capped (`--rounds` tops out at 6, `--candidates` at 8).
+
+## Resilience
+
+Renders cost real money, so the loop is built to lose as little as possible: every backend call retries transient failures (429/5xx/network, exponential backoff, per-attempt timeouts); a failed render inside a round is logged and skipped instead of sinking the other candidates; a crash mid-shoot still writes the audit trail (`critique.md`, `decisions.jsonl`, contact sheet, manifest) for every completed round; a failed probe pair downgrades that one interview question to text; and a director response that misses its schema is retried once before failing.
 
 ## Development
 

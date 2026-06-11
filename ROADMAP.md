@@ -33,6 +33,15 @@
 - [x] More backends: fal (queue API, img2img reference swap, PNG enforcement) and local SDXL/Flux via ComfyUI (user-owned workflow template with `{{PROMPT}}`/`{{SEED}}`/`{{WIDTH}}`/`{{HEIGHT}}` placeholders)
 - [x] Cross-model re-rendering: `rerender <shotDir> -b <backend>` recompiles the contract for the new dialect and writes a comparison report (verdict, differences, measured palette distance)
 
+## Hardening
+
+- [x] Retry layer for every backend (429/5xx/network, exponential backoff + jitter, per-attempt timeouts)
+- [x] Partial-failure isolation: a failed render or probe pair degrades, never aborts; rounds proceed with surviving candidates
+- [x] Crash-safe records: completed rounds keep their audit trail even when a later round throws
+- [x] Input validation: flag ranges with clear errors, PNG magic-byte checks on `--ref` and `critique` inputs
+- [x] Director schema-miss retry with `stop_reason` in the failure message
+- [ ] Live-fire pass with real API keys (needs keys in the environment)
+
 ## v3 — the creative department
 
 - [x] Taste memory across projects: `~/.art-director/taste.md` learned from interview choices and amendment feedback, read by interview/draft/amend (brief always outranks taste); `taste` command, `--no-taste`, `ART_DIRECTOR_TASTE=off`

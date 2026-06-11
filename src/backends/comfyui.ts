@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { aspectDimensions, isPng } from "../image.js";
+import { fetchWithRetry } from "../net.js";
 import type { GeneratedImage, GenerateRequest, ImageBackend } from "./types.js";
 
 /**
@@ -62,7 +63,7 @@ export function createComfyBackend(opts: { url: string; workflowPath: string | n
         substituteWorkflow(template, { prompt: req.prompt, seed: req.seed, width, height }),
       ) as Record<string, unknown>;
 
-      const submit = await fetch(`${opts.url}/prompt`, {
+      const submit = await fetchWithRetry(`${opts.url}/prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: workflow }),
@@ -80,7 +81,16 @@ export function createComfyBackend(opts: { url: string; workflowPath: string | n
       while (!image) {
         if (Date.now() > deadline) throw new Error(`ComfyUI prompt ${promptId} timed out after 10 minutes`);
         await new Promise((r) => setTimeout(r, 2000));
-        const historyRes = await fetch(`${opts.url}/history/${promptId}`);
+        // A blip while polling a 10-minute local render is not a failure.
+        let historyRes: Response;
+        try {
+          historyRes = await fetchWithRetry(`${opts.url}/history/${promptId}`, undefined, {
+            retries: 0,
+            timeoutMs: 10_000,
+          });
+        } catch {
+          continue;
+        }
         if (!historyRes.ok) continue;
         const history = (await historyRes.json()) as Record<string, HistoryEntry>;
         const entry = history[promptId];
@@ -92,7 +102,7 @@ export function createComfyBackend(opts: { url: string; workflowPath: string | n
       }
 
       const params = new URLSearchParams({ filename: image.filename, subfolder: image.subfolder, type: image.type });
-      const viewRes = await fetch(`${opts.url}/view?${params}`);
+      const viewRes = await fetchWithRetry(`${opts.url}/view?${params}`);
       if (!viewRes.ok) throw new Error(`ComfyUI /view ${viewRes.status} for ${image.filename}`);
       const buffer = Buffer.from(await viewRes.arrayBuffer());
       if (!isPng(buffer)) {
